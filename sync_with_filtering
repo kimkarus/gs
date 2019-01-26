@@ -155,19 +155,31 @@ function grabAllTasks(api_url) {
     else 
       {return -1;}
   });
-  //
+  //create date
   sheet.getRange(1, 1, 1, 1).setValue("Создана");
+  //create year
   sheet.getRange(1, 2, 1, 1).setValue("Год");
+  //date due to
   sheet.getRange(1, 3, 1, 1).setValue("Срок до");
+  //all day
   sheet.getRange(1, 4, 1, 1).setValue("Весь день");
+  //subject
   sheet.getRange(1, 5, 1, 1).setValue("Задача");
+  //priority
   sheet.getRange(1, 6, 1, 1).setValue("Приоритет");
+  //responsible_uid
   sheet.getRange(1, 7, 1, 1).setValue("Ответственный ИД");
+  //user_name
   sheet.getRange(1, 8, 1, 1).setValue("Ответственный");
+  //completed
   sheet.getRange(1, 9, 1, 1).setValue("Выполнена");
+  //project id
   sheet.getRange(1, 10, 1, 1).setValue("Проект ИД");
+  //project
   sheet.getRange(1, 11, 1, 1).setValue("Проект");
+  //project parent id
   sheet.getRange(1, 12, 1, 1).setValue("Проект родитель ИД");
+  //item id
   sheet.getRange(1, 13, 1, 1).setValue("ИД");
   //
   
