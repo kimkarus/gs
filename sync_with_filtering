@@ -1,0 +1,324 @@
+function myFunction() {
+  grabAllTasks();
+  //grabAllTasks("https://todoist.com/api/v7/completed/get_all");
+}
+
+function getAllTasks(api_url){
+  var apiURL = "https://todoist.com/API/v7/sync";
+  if(api_url != null) apiURL = api_url;
+  var payload =
+  {
+    "token" : '8213f1af3aa3e9723a647e4433b4910c33d07497',
+    "sync_token": '*',
+    "resource_types" : '["items"]'
+   };
+   var options =
+   {
+     method : "get",
+     payload : payload,
+     contentType: 'application/x-www-form-urlencoded',
+     muteHttpExceptions : true
+   };
+
+   var response = UrlFetchApp.fetch(apiURL, options);
+   var content = JSON.parse(response.getContentText());
+
+  return(content);
+}
+function getCollaborators(){
+  var apiURL = "https://todoist.com/API/v7/sync";
+  
+  var payload =
+  {
+    "token" : '8213f1af3aa3e9723a647e4433b4910c33d07497',
+    "sync_token": '*',
+    "resource_types" : '["collaborators"]'
+   };
+   var options =
+   {
+     method : "get",
+     payload : payload,
+     contentType: 'application/x-www-form-urlencoded',
+     muteHttpExceptions : true
+   };
+
+   var response = UrlFetchApp.fetch(apiURL, options);
+   var content = JSON.parse(response.getContentText());
+
+  return(content);
+}
+
+function getProjects(){
+  var apiURL = "https://todoist.com/API/v7/sync";
+  
+  var payload =
+  {
+    "token" : '8213f1af3aa3e9723a647e4433b4910c33d07497',
+    "sync_token": '*',
+    "resource_types" : '["projects"]'
+   };
+   var options =
+   {
+     method : "get",
+     payload : payload,
+     contentType: 'application/x-www-form-urlencoded',
+     muteHttpExceptions : true
+   };
+
+   var response = UrlFetchApp.fetch(apiURL, options);
+   var content = JSON.parse(response.getContentText());
+
+  return(content);
+}
+
+function grabAllTasks(api_url) {
+
+  var spreadsheetId = "1odWNhpUrspjuX-n6CMIQRHBGR8EwKn2_gKlsBG6mMb4";
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName("Tasks");
+  var range = sheet.getDataRange();
+  var idRowStart = 2;
+  //range.clearContent();
+
+  var data = getAllTasks(api_url);
+  var data_c = getCollaborators();
+  var data_p = getProjects();
+  //var data = getAllTasksV8();
+  var allTasks = [];
+  var need_project_name = "Отдел ИТ"; //project's name for filtering
+  var accept_project_entries = [];
+  for each(var project in data_p.projects){
+    if(project.is_deleted == 1) continue;
+    if(accept_project_entries.length > 0){
+       if(!checkAcceptProjectsId(accept_project_entries, project.parent_id)) continue;
+       if(checkAcceptProjectsId(accept_project_entries, project.id)) continue;
+       accept_project_entries.push(project.id);
+      } else {
+        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
+        accept_project_entries.push(project.id);
+      }
+  }
+  var input_completed = null;
+  if(api_url != null) input_completed = 1;
+  for each(var row in data.items) {
+    var is_good = false;
+    var completed = row.checked;
+    if(input_completed != null) completed = input_completed;
+    
+    if (row.is_deleted == 1) continue;
+    
+    is_good = checkAcceptProjectsId(accept_project_entries, row.project_id);
+    if(!is_good) continue;
+    
+    var project = getProject(data_p.projects, row.project_id);
+    var user_name = getUserName(data_c.collaborators, row.responsible_uid);
+    //
+    var due_date_utc_moment = Moment.moment(row.due_date_utc);
+    var due_date_utc = 0;
+    if(due_date_utc_moment != null)
+    {
+      due_date_utc = due_date_utc_moment.toDate();
+    }
+    var date_added_moment = Moment.moment(row.date_added);
+    var date_added = 0;
+    if(date_added_moment != null)
+    {
+      date_added = date_added_moment.toDate();
+    }
+    var year_added = date_added.getFullYear();
+    var project_name = project.name;
+      
+         allTasks.push([
+           date_added,
+           year_added,
+           due_date_utc,
+           row.all_day, 
+           row.content,
+           row.priority,
+           row.responsible_uid,
+           user_name, 
+           completed,
+           row.project_id,
+           project_name,
+           "",
+           row.id
+         ]);
+  }
+  //
+  
+  Logger.log("allTasks: " + allTasks.length);
+  
+  // Sort tasks by due date [3]
+  allTasks.sort(function(a,b) {
+    if (b[3] < a[3]) 
+      {return 1;} 
+    else 
+      {return -1;}
+  });
+  //
+  sheet.getRange(1, 1, 1, 1).setValue("Создана");
+  sheet.getRange(1, 2, 1, 1).setValue("Год");
+  sheet.getRange(1, 3, 1, 1).setValue("Срок до");
+  sheet.getRange(1, 4, 1, 1).setValue("Весь день");
+  sheet.getRange(1, 5, 1, 1).setValue("Задача");
+  sheet.getRange(1, 6, 1, 1).setValue("Приоритет");
+  sheet.getRange(1, 7, 1, 1).setValue("Ответственный ИД");
+  sheet.getRange(1, 8, 1, 1).setValue("Ответственный");
+  sheet.getRange(1, 9, 1, 1).setValue("Выполнена");
+  sheet.getRange(1, 10, 1, 1).setValue("Проект ИД");
+  sheet.getRange(1, 11, 1, 1).setValue("Проект");
+  sheet.getRange(1, 12, 1, 1).setValue("Проект родитель ИД");
+  sheet.getRange(1, 13, 1, 1).setValue("ИД");
+  //
+  
+  var maxRows = getMaxCountRows(sheet);
+  for (i = 0; i < allTasks.length; i++)
+  {
+    var index = i;
+    var row_id = checkItimeId(allTasks[index], sheet, maxRows);
+    if(row_id >= 0){
+      modifyItem(allTasks[index], sheet, maxRows);
+    } else {
+      addNewItem(allTasks[index], sheet, maxRows+1);
+      maxRows = maxRows+1;
+    }
+    
+  }  
+}
+function modifyItem(item, sheet, row_number)
+{
+  var is_completed = sheet.getRange(row_number, 9, 1, 1).getValue();
+  var item_is_completed = item[8];
+  if(is_completed != item_is_completed) sheet.getRange(row_number, 9, 1, 1).setValue(item_is_completed);
+  //
+  
+  var name = sheet.getRange(row_number, 5, 1, 1).getValue();
+  var item_name = item[4];
+  if(name != item_name) sheet.getRange(row_number, 5, 1, 1).setValue(item_name);
+  //
+  
+  var responsible_uid = sheet.getRange(row_number, 7, 1, 1).getValue();
+  var item_responsible_uid = item[6];
+  if(responsible_uid != item_responsible_uid) sheet.getRange(row_number, 7, 1, 1).setValue(item_responsible_uid);
+  //
+  
+  var priority = sheet.getRange(row_number, 6, 1, 1).getValue();
+  var item_priority = item[5];
+  if(priority != item_priority) sheet.getRange(row_number, 6, 1, 1).setValue(item_priority);
+  //
+  
+  var due_date_utc = sheet.getRange(row_number, 3, 1, 1).getValue();
+  var item_due_date_utc = item[2];
+  if(due_date_utc != item_due_date_utc) sheet.getRange(row_number, 3, 1, 1).setValue(item_due_date_utc);
+  
+}
+function addNewItem(item, sheet, row_number)
+{
+    //create date
+  sheet.getRange(row_number, 1, 1, 1).setValue(item[0]);
+    //create year
+  sheet.getRange(row_number, 2, 1, 1).setValue(item[1]);
+    //date due to
+  sheet.getRange(row_number, 3, 1, 1).setValue(item[2]);
+    //all day
+  sheet.getRange(row_number, 4, 1, 1).setValue(item[3]);
+    //subject
+  sheet.getRange(row_number, 5, 1, 1).setValue(item[4]);
+    //priority
+  sheet.getRange(row_number, 6, 1, 1).setValue(item[5]);
+    //responsible_uid
+  sheet.getRange(row_number, 7, 1, 1).setValue(item[6]);
+    //user_name
+  sheet.getRange(row_number, 8, 1, 1).setValue(item[7]);
+    //completed
+  sheet.getRange(row_number, 9, 1, 1).setValue(item[8]);
+    //project id
+  sheet.getRange(row_number, 10, 1, 1).setValue(item[9]);
+    //project
+  sheet.getRange(row_number, 11, 1, 1).setValue(item[10]);
+    //project parent id
+  sheet.getRange(row_number, 12, 1, 1).setValue(item[11]);
+    //item id
+  sheet.getRange(row_number, 13, 1, 1).setValue(item[12]);
+    //
+}
+function checkItimeId(item, sheet, count)
+{
+  var index = -1;
+  for(i=0; i < count; i++)
+  {
+    var id = sheet.getRange(i+1, 13, 1, 1).getValue();
+    if(id == item[12])
+    {
+      index = i;
+      break;
+    }
+  }
+  return (index);
+}
+function getUserName(arr, need_id)
+{
+  var name = "Ilya Kosarev";
+  if(arr == null) return(name);
+  if(need_id == 0 || need_id == null) return(name);
+
+  for each(var row in arr){
+    if(row.id == need_id) {
+      name = row.full_name;
+      break;
+    }
+  }
+
+  return(name);
+}
+function getProject(arr, need_id)
+{
+  var obj = null;
+  if(arr == null) return(obj);
+
+  for each(var row in arr){
+    if(row.id == need_id) {
+      obj = row;
+      break;
+    }
+  }
+
+  return(obj);
+}
+function checkAcceptProjectsId(arr, need_id)
+{
+  if(arr == null) return(false);
+  if(need_id == null) return(false);
+  for each(var row in arr) {
+    if(row == need_id)return(true);
+  }
+  return(false);
+}
+
+function grabHeader(headerRange) {
+
+  
+  //Grab the Sheet, configure range, delete old data
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheetByName('Today');
+  var sheet = ss.getActiveSheet();
+  var startLocation = sheet.getRange(headerRange);
+  sheet.getRange(startLocation.getRow(), startLocation.getColumn(), 1, 1).clearContent();
+  
+  var todaysDate = Utilities.formatDate(new Date(), SpreadsheetApp.getActive().getSpreadsheetTimeZone(), "EEEE, MMMM d, yyyy");
+  sheet.getRange(headerRange).setValue(todaysDate);
+  
+}
+function getMaxCountRows(sheet)
+{
+  var count = 0;
+  var sheet_data = sheet.getDataRange().getValues();
+  for(var i = sheet_data.length-1 ; i >=0 ; i--){
+    if (sheet_data[i][0] != null && sheet_data[i][0] != ''){
+      count=i+1;
+      break;
+    }
+  }
+  
+  return(count);
+}
