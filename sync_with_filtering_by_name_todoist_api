@@ -85,7 +85,7 @@ function grabAllTasks(api_url) {
   var data_p = getProjects();
   //var data = getAllTasksV8();
   var allTasks = [];
-  var need_project_name = "Отдел ИТ"; //project's name for filtering
+  var need_project_name = "<project's name>"; //project's name for filtering
   var accept_project_entries = [];
   for each(var project in data_p.projects){
     if(project.is_deleted == 1) continue;
@@ -270,7 +270,7 @@ function checkItimeId(item, sheet, count)
 }
 function getUserName(arr, need_id)
 {
-  var name = "Ilya Kosarev";
+  var name = "<default name>";
   if(arr == null) return(name);
   if(need_id == 0 || need_id == null) return(name);
 
