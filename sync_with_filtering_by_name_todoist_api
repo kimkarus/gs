@@ -122,6 +122,24 @@ function grabAllTasks(api_url) {
     
     if (row.is_deleted == 1) continue;
     
+    var due_date_utc_moment = Moment.moment(row.due_date_utc);
+    var due_date_utc = 0;
+    if(due_date_utc_moment != null)
+    {
+      due_date_utc = due_date_utc_moment.toDate();
+    }
+    var date_added_moment = Moment.moment(row.date_added);
+    var date_added = 0;
+    if(date_added_moment != null)
+    {
+      date_added = date_added_moment.toDate();
+    }
+    var year_added = date_added.getFullYear();
+    var project = getProject(data_p.projects, row.project_id);
+    var user_name = getUserName(data_c.collaborators, row.responsible_uid);
+    //
+    var project_name = project.name;
+    
     all_tasks.push([
            date_added,
            year_added,
@@ -140,25 +158,7 @@ function grabAllTasks(api_url) {
     
     is_good = checkAcceptProjectsId(accept_project_entries, row.project_id);
     if(!is_good) continue;
-    
-    var project = getProject(data_p.projects, row.project_id);
-    var user_name = getUserName(data_c.collaborators, row.responsible_uid);
-    //
-    var due_date_utc_moment = Moment.moment(row.due_date_utc);
-    var due_date_utc = 0;
-    if(due_date_utc_moment != null)
-    {
-      due_date_utc = due_date_utc_moment.toDate();
-    }
-    var date_added_moment = Moment.moment(row.date_added);
-    var date_added = 0;
-    if(date_added_moment != null)
-    {
-      date_added = date_added_moment.toDate();
-    }
-    var year_added = date_added.getFullYear();
-    var project_name = project.name;
-      
+
          filtered_tasks.push([
            date_added,
            year_added,
