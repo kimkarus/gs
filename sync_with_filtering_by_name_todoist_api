@@ -8,7 +8,7 @@ function getAllTasks(api_url){
   if(api_url != null) apiURL = api_url;
   var payload =
   {
-    "token" : '8213f1af3aa3e9723a647e4433b4910c33d07497',
+    "token" : '<token>',
     "sync_token": '*',
     "resource_types" : '["items"]'
    };
@@ -30,7 +30,7 @@ function getCollaborators(){
   
   var payload =
   {
-    "token" : '8213f1af3aa3e9723a647e4433b4910c33d07497',
+    "token" : '<token>',
     "sync_token": '*',
     "resource_types" : '["collaborators"]'
    };
@@ -53,7 +53,7 @@ function getProjects(){
   
   var payload =
   {
-    "token" : '8213f1af3aa3e9723a647e4433b4910c33d07497',
+    "token" : '<token>',
     "sync_token": '*',
     "resource_types" : '["projects"]'
    };
@@ -71,21 +71,36 @@ function getProjects(){
   return(content);
 }
 
+function getAllTasksV8(){
+  var apiURL = "https://beta.todoist.com/API/v8/tasks";
+  //"Authorization: Bearer $token"
+  var payload =
+  {
+    "Authorization" : '<token>'
+   };
+   var options =
+   {
+     method : "get",
+     payload : payload,
+     contentType: 'application/x-www-form-urlencoded',
+     muteHttpExceptions : true
+   };
+
+   var response = UrlFetchApp.fetch(apiURL, options);
+   var content = JSON.parse(response.getContentText());
+
+  return(content);
+}
+
+
 function grabAllTasks(api_url) {
-
-  var spreadsheetId = "1odWNhpUrspjuX-n6CMIQRHBGR8EwKn2_gKlsBG6mMb4";
-  var ss = SpreadsheetApp.openById(spreadsheetId);
-  var sheet = ss.getSheetByName("Tasks");
-  var range = sheet.getDataRange();
-  var idRowStart = 2;
-  //range.clearContent();
-
   var data = getAllTasks(api_url);
   var data_c = getCollaborators();
   var data_p = getProjects();
   //var data = getAllTasksV8();
-  var allTasks = [];
-  var need_project_name = "<project's name>"; //project's name for filtering
+  var all_tasks = [];
+  var filtered_tasks = [];
+  var need_project_name = "<project name>";
   var accept_project_entries = [];
   for each(var project in data_p.projects){
     if(project.is_deleted == 1) continue;
@@ -106,6 +121,22 @@ function grabAllTasks(api_url) {
     if(input_completed != null) completed = input_completed;
     
     if (row.is_deleted == 1) continue;
+    
+    all_tasks.push([
+           date_added,
+           year_added,
+           due_date_utc,
+           row.all_day, 
+           row.content,
+           row.priority,
+           row.responsible_uid,
+           user_name, 
+           completed,
+           row.project_id,
+           project_name,
+           "",
+           row.id
+         ]);
     
     is_good = checkAcceptProjectsId(accept_project_entries, row.project_id);
     if(!is_good) continue;
@@ -128,7 +159,7 @@ function grabAllTasks(api_url) {
     var year_added = date_added.getFullYear();
     var project_name = project.name;
       
-         allTasks.push([
+         filtered_tasks.push([
            date_added,
            year_added,
            due_date_utc,
@@ -145,16 +176,55 @@ function grabAllTasks(api_url) {
          ]);
   }
   //
+  var spreadsheetId = "1odWNhpUrspjuX-n6CMIQRHBGR8EwKn2_gKlsBG6mMb4";
+  var ss = SpreadsheetApp.openById(spreadsheetId);
   
-  Logger.log("allTasks: " + allTasks.length);
   
-  // Sort tasks by due date [3]
-  allTasks.sort(function(a,b) {
-    if (b[3] < a[3]) 
+  var idRowStart = 2; 
+  Logger.log("allTasks: " + all_tasks.length);
+  Logger.log("allTasks: " + filtered_tasks.length);
+  
+  processTasks("Work", ss, filtered_tasks);
+  processTasks("All", ss, all_tasks);
+  
+}
+function processTasks(sheet_name, ss, arr)
+{
+  var sheet = ss.getSheetByName(sheet_name);
+  setHeader(sheet, ss);
+  sortArr(arr, 3);
+  fillSheet(arr, sheet);  
+}
+function sortArr(arr, indexCol)
+{
+  // Sort tasks by due date [indexCol]
+  arr.sort(function(a,b) {
+    if (b[indexCol] < a[indexCol]) 
       {return 1;} 
     else 
       {return -1;}
   });
+}
+function fillSheet(arr, sheet)
+{
+  var maxRows = getMaxCountRows(sheet);
+  
+  for (i = 0; i < arr.length; i++)
+  {
+    var index = i;
+    var row_id = checkItimeId(arr[index], sheet, maxRows);
+    if(row_id >= 0){
+      modifyItem(arr[index], sheet, maxRows);
+    } else {
+      addNewItem(arr[index], sheet, maxRows+1);
+      maxRows = maxRows+1;
+    }
+  }
+}
+function setHeader(sheet, ss)
+{
+  var range = sheet.getDataRange();
+  
   //create date
   sheet.getRange(1, 1, 1, 1).setValue("Создана");
   //create year
@@ -182,20 +252,6 @@ function grabAllTasks(api_url) {
   //item id
   sheet.getRange(1, 13, 1, 1).setValue("ИД");
   //
-  
-  var maxRows = getMaxCountRows(sheet);
-  for (i = 0; i < allTasks.length; i++)
-  {
-    var index = i;
-    var row_id = checkItimeId(allTasks[index], sheet, maxRows);
-    if(row_id >= 0){
-      modifyItem(allTasks[index], sheet, maxRows);
-    } else {
-      addNewItem(allTasks[index], sheet, maxRows+1);
-      maxRows = maxRows+1;
-    }
-    
-  }  
 }
 function modifyItem(item, sheet, row_number)
 {
