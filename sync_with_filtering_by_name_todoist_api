@@ -184,16 +184,17 @@ function grabAllTasks(api_url) {
   Logger.log("allTasks: " + all_tasks.length);
   Logger.log("allTasks: " + filtered_tasks.length);
   
-  processTasks("Work", ss, filtered_tasks);
-  processTasks("All", ss, all_tasks);
+  processTasks("Work", ss, filtered_tasks, false, true);
+  processTasks("All", ss, all_tasks, true, false);
   
 }
-function processTasks(sheet_name, ss, arr)
+function processTasks(sheet_name, ss, arr, clean_range, check_exists)
 {
   var sheet = ss.getSheetByName(sheet_name);
+  if(clean_range) sheet.clear();
   setHeader(sheet, ss);
   sortArr(arr, 3);
-  fillSheet(arr, sheet);  
+  fillSheet(arr, sheet, check_exists);  
 }
 function sortArr(arr, indexCol)
 {
@@ -205,14 +206,14 @@ function sortArr(arr, indexCol)
       {return -1;}
   });
 }
-function fillSheet(arr, sheet)
+function fillSheet(arr, sheet, check_exists)
 {
   var maxRows = getMaxCountRows(sheet);
   
   for (i = 0; i < arr.length; i++)
   {
     var index = i;
-    var row_id = checkItimeId(arr[index], sheet, maxRows);
+    var row_id = checkItimeId(arr[index], sheet, maxRows, check_exists);
     if(row_id >= 0){
       modifyItem(arr[index], sheet, maxRows);
     } else {
@@ -310,9 +311,10 @@ function addNewItem(item, sheet, row_number)
   sheet.getRange(row_number, 13, 1, 1).setValue(item[12]);
     //
 }
-function checkItimeId(item, sheet, count)
+function checkItimeId(item, sheet, count, check_exists)
 {
   var index = -1;
+  if(!check_exists) return(index);
   for(i=0; i < count; i++)
   {
     var id = sheet.getRange(i+1, 13, 1, 1).getValue();
