@@ -8,8 +8,7 @@ function myFunction() {
   var need_project_name = "<project name for searching>";
   var spreadsheetId = "<sheet id>";
   var default_name = "<default name>";
-  
-  
+
   var count_c = 100;
   count_c = getParamValue(2, spreadsheetId);
   var ipc_start = 0;
@@ -17,13 +16,13 @@ function myFunction() {
   var tmp_var = getParamValue(1, spreadsheetId);
   if(tmp_var > 0 && tmp_var < count_c) ipc_start = tmp_var;
   //
-  if(ipc_start <=0 ) grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, false, default_name);
+  if(ipc_start <=0 ) grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, false, default_name, "Work");
   //
   for(var ipc = ipc_start; ipc < count_c;  ipc++){
     var data_completed_tasks = getResource(api_URL_completed_get_all, token, '["items"]', ipc);
     setParamConfig("completed_tasks_ipc", ipc, 1, spreadsheetId);
     if(data_completed_tasks==null) break;
-    grabTasks(data_completed_tasks, data_c, data_p, need_project_name, spreadsheetId, token, true, default_name);
+    grabTasks(data_completed_tasks, data_c, data_p, need_project_name, spreadsheetId, token, true, default_name, "Work");
   }
 }
 function setParamConfig(param_name, value, column_number, spreadsheetId)
@@ -111,9 +110,8 @@ function getResponseContent(apiURL, options)
   return(content);
 }
 
-function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, completed_tasks, default_name) {
+function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, completed_tasks, default_name, sheet_name) {
   if(data == null || data_c == null || data_p == null) return;
-  //var data = getAllTasksV8();
   var all_tasks = [];
   var filtered_tasks = [];
   var accept_project_entries = [];
@@ -202,9 +200,7 @@ function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token
   Logger.log("allTasks: " + all_tasks.length);
   Logger.log("allTasks: " + filtered_tasks.length);
   
-  processTasks("Work", ss, filtered_tasks, false, true);
-  //processTasks("All", ss, all_tasks, false, true);
-  //processTasks("Borisov Pavel", ss, filtered_tasks, false, true, 19198224);
+  processTasks(sheet_name, ss, filtered_tasks, false, true);
   
 }
 function getDate(value)
@@ -251,7 +247,6 @@ function fillSheet(arr, sheet, check_exists)
   {
     var index = i;
     maxRows = getMaxCountRows(sheet);
-    //if(id_user != null) if(id_user != arr[index][6]) continue;
     var row_number = checkItimeId(arr[index][13], sheet, maxRows, check_exists);
     if(row_number >= 0){
       addModifyItem(arr[index], sheet, row_number);
@@ -263,8 +258,6 @@ function fillSheet(arr, sheet, check_exists)
 }
 function setHeader(sheet, ss)
 {
-  //var range = sheet.getDataRange();
-  
   //create date
   sheet.getRange(1, 1, 1, 1).setValue("Создана");
   //create year
@@ -434,20 +427,6 @@ function checkAcceptProjectsId(arr, need_id)
   return(false);
 }
 
-function grabHeader(headerRange) {
-
-  
-  //Grab the Sheet, configure range, delete old data
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheetByName('Today');
-  var sheet = ss.getActiveSheet();
-  var startLocation = sheet.getRange(headerRange);
-  sheet.getRange(startLocation.getRow(), startLocation.getColumn(), 1, 1).clearContent();
-  
-  var todaysDate = Utilities.formatDate(new Date(), SpreadsheetApp.getActive().getSpreadsheetTimeZone(), "EEEE, MMMM d, yyyy");
-  sheet.getRange(headerRange).setValue(todaysDate);
-  
-}
 function getMaxCountRows(sheet)
 {
   var count = 0;
