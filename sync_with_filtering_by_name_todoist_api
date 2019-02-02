@@ -5,9 +5,10 @@ function myFunction() {
   var data_c = getResource(api_URL, token, '["collaborators"]');
   var data_p = getResource(api_URL, token, '["projects"]');
   var data = getResource(api_URL, token, '["items"]');
-  var need_project_name = "<name project for searching>";
-  var spreadsheetId = "<id google sheet>";
-  grabAllTasks(data, data_c, data_p, need_project_name, spreadsheetId);
+  var need_project_name = "<project name for searching>";
+  var spreadsheetId = "<sheet id>";
+  var default_name = "<default name>";
+  
   
   var count_c = 100;
   count_c = getParamValue(2, spreadsheetId);
@@ -16,11 +17,13 @@ function myFunction() {
   var tmp_var = getParamValue(1, spreadsheetId);
   if(tmp_var > 0 && tmp_var < count_c) ipc_start = tmp_var;
   //
+  if(ipc_start <=0 ) grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, false, default_name);
+  //
   for(var ipc = ipc_start; ipc < count_c;  ipc++){
     var data_completed_tasks = getResource(api_URL_completed_get_all, token, '["items"]', ipc);
     setParamConfig("completed_tasks_ipc", ipc, 1, spreadsheetId);
     if(data_completed_tasks==null) break;
-    grabCompletedTasks(data_completed_tasks, data_c, data_p, need_project_name, spreadsheetId);
+    grabTasks(data_completed_tasks, data_c, data_p, need_project_name, spreadsheetId, token, true, default_name);
   }
 }
 function setParamConfig(param_name, value, column_number, spreadsheetId)
@@ -41,9 +44,31 @@ function getParamValue(column_number, spreadsheetId)
   if(value == null || value == "") value = -1;
   return(value);
 }
-function getResource(apiURL, token, resource_type, ipc){
-  if(ipc != null) {
-          var payload =
+function getResource(apiURL, token, resource_type, ipc, id){
+
+   var payload = getPayload(resource_type, token, ipc, id);
+   var options = getOptions(payload);
+   var content = getResponseContent(apiURL, options);
+
+  return(content);
+}
+function getOptions(payload)
+{
+  var options =
+          {
+            method : "get",
+            payload : payload,
+            contentType: 'application/x-www-form-urlencoded',
+            muteHttpExceptions : true
+          };
+  
+  return(options);
+}
+function getPayload(resource_type, token, ipc, id)
+{
+  var payload = null;
+  if(ipc != null){
+    payload =
           {
             "token" : token,
             "sync_token": '*',
@@ -51,136 +76,42 @@ function getResource(apiURL, token, resource_type, ipc){
             "offset" : ipc.toString()
             
           };
-      var options =
-          {
-            method : "get",
-            payload : payload,
-            contentType: 'application/x-www-form-urlencoded',
-            muteHttpExceptions : true
-          };
-  }
-    else{    
-      var payload =
-          {
-            "token" : token,
-            "sync_token": '*',
-            "resource_types" : resource_type
-          };
-      var options =
-          {
-            method : "get",
-            payload : payload,
-            contentType: 'application/x-www-form-urlencoded',
-            muteHttpExceptions : true
-          };
+  } else {
+    if(id != null){
+      payload =
+        {
+          "token" : token,
+          "item_id" : id.toString()
+        };
+    } else {
+      payload =
+        {
+          "token" : token,
+          "sync_token": '*',
+          "resource_types" : resource_type
+        };
     }
-
-   var content = getResponseContent(apiURL, options);
-
-  return(content);
+  }
+  
+  return(payload);
 }
-
 
 function getResponseContent(apiURL, options)
 {
   var response = UrlFetchApp.fetch(apiURL, options);
   var response_content_text = response.getContentText();
   var content = null;
-  if(response_content_text != null && response_content_text != "") var content = JSON.parse(response_content_text);
+  if(response_content_text != null && response_content_text != "") {
+    try{
+      content = JSON.parse(response_content_text);
+    } catch (e){
+      content = null;
+    }
+  }
   return(content);
 }
-function grabAllTasks(data, data_c, data_p, need_project_name, spreadsheetId) {
-  //var data = getAllTasksV8();
-  if(data == null || data_c == null || data_p == null) return;
-  var all_tasks = [];
-  var filtered_tasks = [];
-  var accept_project_entries = [];
-  for each(var project in data_p.projects){
-    if(project.is_deleted == 1) continue;
-    if(accept_project_entries.length > 0){
-       if(!checkAcceptProjectsId(accept_project_entries, project.parent_id)) continue;
-       if(checkAcceptProjectsId(accept_project_entries, project.id)) continue;
-       accept_project_entries.push(project.id);
-      } else {
-        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
-        accept_project_entries.push(project.id);
-      }
-  }
-  
-  for each(var row in data.items) {
-    var is_good = false;
-    var completed = row.checked;
-    
-    if (row.is_deleted == 1) continue;
-    
-    var due_date_utc_moment = Moment.moment(row.due_date_utc);
-    var due_date_utc = 0;
-    if(due_date_utc_moment != null)
-    {
-      due_date_utc = due_date_utc_moment.toDate();
-    }
-    var date_added_moment = Moment.moment(row.date_added);
-    var date_added = 0;
-    if(date_added_moment != null)
-    {
-      date_added = date_added_moment.toDate();
-    }
-    var year_added = date_added.getFullYear();
-    var project = getProject(data_p.projects, row.project_id);
-    var user_name = getUserName(data_c.collaborators, row.responsible_uid);
-    //
-    var project_name = project.name;
-    
-    all_tasks.push([
-           date_added,
-           year_added,
-           due_date_utc,
-           row.all_day, 
-           row.content,
-           row.priority,
-           row.responsible_uid,
-           user_name, 
-           completed,
-           row.project_id,
-           project_name,
-           "",
-           row.id
-         ]);
-    
-    is_good = checkAcceptProjectsId(accept_project_entries, row.project_id);
-    if(!is_good) continue;
 
-         filtered_tasks.push([
-           date_added,
-           year_added,
-           due_date_utc,
-           row.all_day, 
-           row.content,
-           row.priority,
-           row.responsible_uid,
-           user_name, 
-           completed,
-           row.project_id,
-           project_name,
-           "",
-           row.id
-         ]);
-  }
-  //
-  
-  var ss = SpreadsheetApp.openById(spreadsheetId);
-  
-  
-  var idRowStart = 2; 
-  Logger.log("allTasks: " + all_tasks.length);
-  Logger.log("allTasks: " + filtered_tasks.length);
-  
-  processTasks("Work", ss, filtered_tasks, false, true);
-  //processTasks("All", ss, all_tasks, true, false);
-  //processTasks("Borisov Pavel", ss, filtered_tasks, false, true, 19198224);
-  
-}
-function grabCompletedTasks(data, data_c, data_p, need_project_name, spreadsheetId) {
+function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, completed_tasks, default_name) {
   if(data == null || data_c == null || data_p == null) return;
   //var data = getAllTasksV8();
   var all_tasks = [];
@@ -197,51 +128,69 @@ function grabCompletedTasks(data, data_c, data_p, need_project_name, spreadsheet
         accept_project_entries.push(project.id);
       }
   }
-  var input_completed = 1;
   for each(var row in data.items) {
-    var is_good = false;
     
-    var completed = input_completed;
+    var item = null;
+    
+    if(completed_tasks){
+      item = getSingleItem(token, row.id);
+    } else {
+      item = row;
+    }
         
-    var project = getProject(data_p.projects, row.project_id);
+    if(item == null) continue;
+    var completed = item.checked;
+    
+    if (item.is_deleted == 1) continue;
+    
+    var due_date_utc = getDate(item.due_date_utc);
+    var date_added = getDate(item.date_added);
+    var date_completed = getDate(item.date_completed);
+    var year_added = date_added.getFullYear();
+    
+    var project = getProject(data_p.projects, item.project_id);
+    var user_name = getUserName(data_c.collaborators, item.responsible_uid, default_name);
     //
     var project_name = "";
-    var user_name = getUserName(data_c.collaborators, row.user_id);
-    if(project != null) project_name = project.name;
+    var responsible_uid = 0;
+    if(item.responsible_uid != null) responsible_uid = item.responsible_uid;
+    if(project!=null) project_name = project.name;
     
     all_tasks.push([
-           0,
-           0,
-           0,
-           0, 
-           row.content,
-           0,
-           row.user_id,
+           date_added,
+           year_added,
+           due_date_utc,
+           date_completed,
+           item.all_day, 
+           item.content,
+           item.priority,
+           responsible_uid,
            user_name, 
            completed,
-           row.project_id,
+           item.project_id,
            project_name,
            "",
-           row.id
+           item.id
          ]);
     
-    is_good = checkAcceptProjectsId(accept_project_entries, row.project_id);
+    is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
 
          filtered_tasks.push([
-           0,
-           0,
-           0,
-           0, 
-           row.content,
-           0,
-           0,
+           date_added,
+           year_added,
+           due_date_utc,
+           date_completed,
+           item.all_day, 
+           item.content,
+           item.priority,
+           responsible_uid,
            user_name, 
            completed,
-           row.project_id,
+           item.project_id,
            project_name,
            "",
-           row.id
+           item.id
          ]);
   }
   //
@@ -258,13 +207,31 @@ function grabCompletedTasks(data, data_c, data_p, need_project_name, spreadsheet
   //processTasks("Borisov Pavel", ss, filtered_tasks, false, true, 19198224);
   
 }
-function processTasks(sheet_name, ss, arr, clean_range, check_exists, id_user)
+function getDate(value)
+{
+  var moment = Moment.moment(value);
+    var new_value = "";
+    if(moment != null && value != null)
+    {
+      new_value = moment.toDate();
+    }
+  return(new_value);
+}
+function getSingleItem(token, id)
+{
+  var apiURL = "https://todoist.com/api/v7/items/get";
+  var item = null;
+  var data = getResource(apiURL, token, '["item"]', null, id);
+  if(data != null) item = data.item;
+  return(item);
+}
+function processTasks(sheet_name, ss, arr, clean_range, check_exists)
 {
   var sheet = ss.getSheetByName(sheet_name);
   if(clean_range) sheet.clear();
   setHeader(sheet, ss);
   sortArr(arr, 3);
-  fillSheet(arr, sheet, check_exists, id_user);  
+  fillSheet(arr, sheet, check_exists);  
 }
 function sortArr(arr, indexCol)
 {
@@ -276,19 +243,20 @@ function sortArr(arr, indexCol)
       {return -1;}
   });
 }
-function fillSheet(arr, sheet, check_exists, id_user)
+function fillSheet(arr, sheet, check_exists)
 {
   var maxRows = getMaxCountRows(sheet);
   
   for (i = 0; i < arr.length; i++)
   {
     var index = i;
-    if(id_user != null) if(id_user != arr[index][6]) continue;
-    var row_id = checkItimeId(arr[index][12], sheet, maxRows, check_exists);
-    if(row_id >= 0){
-      modifyItem(arr[index], sheet, row_id+1);
+    maxRows = getMaxCountRows(sheet);
+    //if(id_user != null) if(id_user != arr[index][6]) continue;
+    var row_number = checkItimeId(arr[index][13], sheet, maxRows, check_exists);
+    if(row_number >= 0){
+      addModifyItem(arr[index], sheet, row_number);
     } else {
-      addNewItem(arr[index], sheet, maxRows+1);
+      addModifyItem(arr[index], sheet, maxRows+1);
       maxRows = maxRows+1;
     }
   }
@@ -303,107 +271,76 @@ function setHeader(sheet, ss)
   sheet.getRange(1, 2, 1, 1).setValue("Год");
   //date due to
   sheet.getRange(1, 3, 1, 1).setValue("Срок до");
+  //date completed
+  sheet.getRange(1, 4, 1, 1).setValue("Дата выполнения");
   //all day
-  sheet.getRange(1, 4, 1, 1).setValue("Весь день");
+  sheet.getRange(1, 5, 1, 1).setValue("Весь день");
   //subject
-  sheet.getRange(1, 5, 1, 1).setValue("Задача");
+  sheet.getRange(1, 6, 1, 1).setValue("Задача");
   //priority
-  sheet.getRange(1, 6, 1, 1).setValue("Приоритет");
+  sheet.getRange(1, 7, 1, 1).setValue("Приоритет");
   //responsible_uid
-  sheet.getRange(1, 7, 1, 1).setValue("Ответственный ИД");
+  sheet.getRange(1, 8, 1, 1).setValue("Ответственный ИД");
   //user_name
-  sheet.getRange(1, 8, 1, 1).setValue("Ответственный");
+  sheet.getRange(1, 9, 1, 1).setValue("Ответственный");
   //completed
-  sheet.getRange(1, 9, 1, 1).setValue("Выполнена");
+  sheet.getRange(1, 10, 1, 1).setValue("Выполнена");
   //project id
-  sheet.getRange(1, 10, 1, 1).setValue("Проект ИД");
+  sheet.getRange(1, 11, 1, 1).setValue("Проект ИД");
   //project
-  sheet.getRange(1, 11, 1, 1).setValue("Проект");
+  sheet.getRange(1, 12, 1, 1).setValue("Проект");
   //project parent id
-  sheet.getRange(1, 12, 1, 1).setValue("Проект родитель ИД");
+  sheet.getRange(1, 13, 1, 1).setValue("Проект родитель ИД");
   //item id
-  sheet.getRange(1, 13, 1, 1).setValue("ИД");
+  sheet.getRange(1, 14, 1, 1).setValue("ИД");
   //
-  sheet.getRange(1, 14, 1, 1).setValue("Дата изменения");
+  sheet.getRange(1, 15, 1, 1).setValue("Дата изменения");
   //
-  sheet.getRange(1, 15, 1, 1).setValue("Статус изменений");
+  sheet.getRange(1, 16, 1, 1).setValue("Статус изменений");
   //
-  sheet.getRange(1, 16, 1, 1).setValue("Дата проверки");
+  sheet.getRange(1, 17, 1, 1).setValue("Дата проверки");
   //
-  sheet.getRange(1, 17, 1, 1).setValue("Время проверки");
+  sheet.getRange(1, 18, 1, 1).setValue("Время проверки");
 }
 function modifyItem(item, sheet, row_number)
 {
-  var id_modified = 0;
+  var id_modified = -1;
   
-  var is_completed = sheet.getRange(row_number, 9, 1, 1).getValues()[0][0];
-  var item_is_completed = item[8];
+  var is_completed = sheet.getRange(row_number, 10, 1, 1).getValues()[0][0];
+  var item_is_completed = item[9];
   if(is_completed != item_is_completed) 
   {
-    sheet.getRange(row_number, 9, 1, 1).setValue(item_is_completed);
     id_modified = 1;
   }
   //
   
-  var name = sheet.getRange(row_number, 5, 1, 1).getValues()[0][0];
-  var item_name = item[4];
+  var name = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
+  var item_name = item[5];
   if(name != item_name) 
   {
-    sheet.getRange(row_number, 5, 1, 1).setValue(item_name);
     id_modified = 2;
   }
   //
   
-  var responsible_uid = sheet.getRange(row_number, 7, 1, 1).getValues()[0][0];
-  var item_responsible_uid = item[6];
+  var responsible_uid = sheet.getRange(row_number, 8, 1, 1).getValues()[0][0];
+  var item_responsible_uid = item[7];
   if(responsible_uid != item_responsible_uid && item_responsible_uid != null) 
   {
-    sheet.getRange(row_number, 7, 1, 1).setValue(item_responsible_uid);
     id_modified = 3;
   }
   //
   
-  var priority = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
-  var item_priority = item[5];
+  var priority = sheet.getRange(row_number, 7, 1, 1).getValues()[0][0];
+  var item_priority = item[6];
   if(priority != item_priority) 
   {
-    sheet.getRange(row_number, 6, 1, 1).setValue(item_priority);
     id_modified = 4;
   }
   //
-  var user_id = sheet.getRange(row_number, 7, 1, 1).getValues()[0][0];
-  var user_name = sheet.getRange(row_number, 8, 1, 1).getValues()[0][0];
-  var item_user_id = item[6];
-  var item_user_name = item[7];
-  if(item_user_name != 0){
-    if(user_name != item_user_name) 
-    {
-      sheet.getRange(row_number, 7, 1, 1).setValue(item_user_id);
-      sheet.getRange(row_number, 8, 1, 1).setValue(item_user_name);
-      id_modified = 5;
-    }
-  }
-  
-  /*var due_date_utc = sheet.getRange(row_number, 3, 1, 1).getValue();
-  var item_due_date_utc = item[2];
-  if(due_date_utc != item_due_date_utc) 
-  {
-    sheet.getRange(row_number, 3, 1, 1).setValue(item_due_date_utc);
-    is_modified = 5;
-  }*/
-  var now = new Date();
-  if(id_modified > 0)
-  {
-    
-    sheet.getRange(row_number, 14, 1, 1).setValue(now);
-    sheet.getRange(row_number, 15, 1, 1).setValue(id_modified);
-    sheet.getRange(row_number, 17, 1, 1).setValue(now.getTime());
-  }
-  //sheet.getRange(row_number, 16, 1, 1).setValue(now);
-  //sheet.getRange(row_number, 17, 1, 1).setValue(now.getTime());
+  if(id_modified > 0) addModifyItem(item, sheet, row_number);
   
 }
-function addNewItem(item, sheet, row_number)
+function addModifyItem(item, sheet, row_number)
 {
   var now = new Date();
     //create date
@@ -412,54 +349,55 @@ function addNewItem(item, sheet, row_number)
   sheet.getRange(row_number, 2, 1, 1).setValue(item[1]);
     //date due to
   sheet.getRange(row_number, 3, 1, 1).setValue(item[2]);
-    //all day
+    //completed date
   sheet.getRange(row_number, 4, 1, 1).setValue(item[3]);
-    //subject
+    //all day
   sheet.getRange(row_number, 5, 1, 1).setValue(item[4]);
-    //priority
+    //subject
   sheet.getRange(row_number, 6, 1, 1).setValue(item[5]);
-    //responsible_uid
+    //priority
   sheet.getRange(row_number, 7, 1, 1).setValue(item[6]);
+    //responsible_uid
+  sheet.getRange(row_number, 8, 1, 1).setValue(item[7].toString());
     //user_name
-  sheet.getRange(row_number, 8, 1, 1).setValue(item[7]);
-    //completed
   sheet.getRange(row_number, 9, 1, 1).setValue(item[8]);
-    //project id
+    //completed
   sheet.getRange(row_number, 10, 1, 1).setValue(item[9]);
+    //project id
+  sheet.getRange(row_number, 11, 1, 1).setValue(item[10].toString());
     //project
-  sheet.getRange(row_number, 11, 1, 1).setValue(item[10]);
-    //project parent id
   sheet.getRange(row_number, 12, 1, 1).setValue(item[11]);
+    //project parent id
+  sheet.getRange(row_number, 13, 1, 1).setValue(item[12].toString());
     //item id
-  sheet.getRange(row_number, 13, 1, 1).setValue(item[12]);
+  sheet.getRange(row_number, 14, 1, 1).setValue(item[13].toString());
     //
+  sheet.getRange(row_number, 15, 1, 1).setValue(now);
   //
-  //
-  sheet.getRange(row_number, 16, 1, 1).setValue(now);
-  sheet.getRange(row_number, 17, 1, 1).setValue(now.getTime());
+  sheet.getRange(row_number, 16, 1, 1).setValue(now.getTime());
 }
 function checkItimeId(item_id, sheet, count, check_exists)
 {
   var index = -1;
   if(!check_exists) return(index);
-  //sheet.getRange(row, column)
-  
+  item_id = item_id.toString();
   for(j=0; j < count; j++)
   {
+    var sheet_item_id = -1;
     index = -1;
-    var id = sheet.getRange(j+1, 13, 1, 1).getValues()[0][0];
-    //var id = sheet.getRange(j+1, 13, 1, 1).getValue();
-    if(id == item_id)
+    sheet_item_id = sheet.getRange(j+1, 14, 1, 1).getValues()[0][0].toString();
+    //sheet_item_id = Number(sheet_item_id);
+    if(sheet_item_id == item_id)
     {
-      index = j;
+      index = j+1;
       break;
     }
   }
   return (index);
 }
-function getUserName(arr, need_id)
+function getUserName(arr, need_id, default_name)
 {
-  var name = "<default name>";
+  var name = default_name;
   if(arr == null) return(name);
   if(need_id == 0 || need_id == null) return(name);
 
