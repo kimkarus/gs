@@ -16,13 +16,28 @@ function myFunction() {
   var tmp_var = getParamValue(1, spreadsheetId);
   if(tmp_var > 0 && tmp_var < count_c) ipc_start = tmp_var;
   //
-  if(ipc_start <=0 ) grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, false, default_name, "Work");
+  var tmp_var3 = getParamValue(3, spreadsheetId);
+  var tmp_var4 = getParamValue(4, spreadsheetId);
+  //
+  var need_refresh_tasks = false;
+  if(ipc_start <=0) need_refresh_tasks = true;
+  if(tmp_var3 == null || tmp_var3 == 0) need_refresh_tasks = true;
+  if(tmp_var3 != null) {
+    if(tmp_var > 0){
+      if((tmp_var / tmp_var4) > tmp_var3) need_refresh_tasks = true;
+    }
+  }
+  //
+  if(need_refresh_tasks ) {
+    grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, false, default_name, "Work", true);
+    setParamConfig("refreshed", Math.floor(tmp_var / tmp_var4), 3, spreadsheetId);
+  }
   //
   for(var ipc = ipc_start; ipc < count_c;  ipc++){
     var data_completed_tasks = getResource(api_URL_completed_get_all, token, '["items"]', ipc);
     setParamConfig("completed_tasks_ipc", ipc, 1, spreadsheetId);
     if(data_completed_tasks==null) break;
-    grabTasks(data_completed_tasks, data_c, data_p, need_project_name, spreadsheetId, token, true, default_name, "Work");
+    grabTasks(data_completed_tasks, data_c, data_p, need_project_name, spreadsheetId, token, true, default_name, "Work", false);
   }
 }
 function setParamConfig(param_name, value, column_number, spreadsheetId)
@@ -110,7 +125,7 @@ function getResponseContent(apiURL, options)
   return(content);
 }
 
-function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, completed_tasks, default_name, sheet_name) {
+function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshing) {
   if(data == null || data_c == null || data_p == null) return;
   var all_tasks = [];
   var filtered_tasks = [];
@@ -144,7 +159,15 @@ function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token
     var due_date_utc = getDate(item.due_date_utc);
     var date_added = getDate(item.date_added);
     var date_completed = getDate(item.date_completed);
+    var year_completed = "";
+    var month_completed = "";
+    if(date_completed != null && date_completed != ""){
+      year_completed = date_completed.getFullYear();
+      month_completed = date_completed.getMonth();
+    }
     var year_added = date_added.getFullYear();
+    var now = new Date();
+    var now_time = now.getTime();
     
     var project = getProject(data_p.projects, item.project_id);
     var user_name = getUserName(data_c.collaborators, item.responsible_uid, default_name);
@@ -156,19 +179,24 @@ function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token
     
     all_tasks.push([
            date_added,
-           year_added,
            due_date_utc,
            date_completed,
+           year_completed.toString(),
+           month_completed.toString(),
            item.all_day, 
            item.content,
            item.priority,
-           responsible_uid,
+           responsible_uid.toString(),
            user_name, 
            completed,
-           item.project_id,
+           item.project_id.toString(),
            project_name,
            "",
-           item.id
+           item.id.toString(),
+           now,
+           "",
+           now,
+           now_time
          ]);
     
     is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
@@ -176,19 +204,24 @@ function grabTasks(data, data_c, data_p, need_project_name, spreadsheetId, token
 
          filtered_tasks.push([
            date_added,
-           year_added,
            due_date_utc,
            date_completed,
+           year_completed.toString(),
+           month_completed.toString(),
            item.all_day, 
            item.content,
            item.priority,
-           responsible_uid,
+           responsible_uid.toString(),
            user_name, 
            completed,
-           item.project_id,
+           item.project_id.toString(),
            project_name,
            "",
-           item.id
+           item.id.toString(),
+           now,
+           "",
+           now,
+           now_time
          ]);
   }
   //
@@ -247,9 +280,9 @@ function fillSheet(arr, sheet, check_exists)
   {
     var index = i;
     maxRows = getMaxCountRows(sheet);
-    var row_number = checkItimeId(arr[index][13], sheet, maxRows, check_exists);
+    var row_number = checkItimeId(arr[index][14], sheet, maxRows, check_exists);
     if(row_number >= 0){
-      addModifyItem(arr[index], sheet, row_number);
+      modifyItem(arr[index], sheet, row_number);
     } else {
       addModifyItem(arr[index], sheet, maxRows+1);
       maxRows = maxRows+1;
@@ -260,53 +293,54 @@ function setHeader(sheet, ss)
 {
   //create date
   sheet.getRange(1, 1, 1, 1).setValue("Создана");
-  //create year
-  sheet.getRange(1, 2, 1, 1).setValue("Год");
   //date due to
-  sheet.getRange(1, 3, 1, 1).setValue("Срок до");
+  sheet.getRange(1, 2, 1, 1).setValue("Срок до");
   //date completed
-  sheet.getRange(1, 4, 1, 1).setValue("Дата выполнения");
+  sheet.getRange(1, 3, 1, 1).setValue("Дата выполнения");
+  //year completed
+  sheet.getRange(1, 4, 1, 1).setValue("Год");
+  //month completed
+  sheet.getRange(1, 5, 1, 1).setValue("Месяц");
   //all day
-  sheet.getRange(1, 5, 1, 1).setValue("Весь день");
+  sheet.getRange(1, 6, 1, 1).setValue("Весь день");
   //subject
-  sheet.getRange(1, 6, 1, 1).setValue("Задача");
+  sheet.getRange(1, 7, 1, 1).setValue("Задача");
   //priority
-  sheet.getRange(1, 7, 1, 1).setValue("Приоритет");
+  sheet.getRange(1, 8, 1, 1).setValue("Приоритет");
   //responsible_uid
-  sheet.getRange(1, 8, 1, 1).setValue("Ответственный ИД");
+  sheet.getRange(1, 9, 1, 1).setValue("Ответственный ИД");
   //user_name
-  sheet.getRange(1, 9, 1, 1).setValue("Ответственный");
+  sheet.getRange(1, 10, 1, 1).setValue("Ответственный");
   //completed
-  sheet.getRange(1, 10, 1, 1).setValue("Выполнена");
+  sheet.getRange(1, 11, 1, 1).setValue("Выполнена");
   //project id
-  sheet.getRange(1, 11, 1, 1).setValue("Проект ИД");
+  sheet.getRange(1, 12, 1, 1).setValue("Проект ИД");
   //project
-  sheet.getRange(1, 12, 1, 1).setValue("Проект");
+  sheet.getRange(1, 13, 1, 1).setValue("Проект");
   //project parent id
-  sheet.getRange(1, 13, 1, 1).setValue("Проект родитель ИД");
+  sheet.getRange(1, 14, 1, 1).setValue("Проект родитель ИД");
   //item id
-  sheet.getRange(1, 14, 1, 1).setValue("ИД");
+  sheet.getRange(1, 15, 1, 1).setValue("ИД");
   //
-  sheet.getRange(1, 15, 1, 1).setValue("Дата изменения");
+  sheet.getRange(1, 16, 1, 1).setValue("Дата изменения");
   //
-  sheet.getRange(1, 16, 1, 1).setValue("Статус изменений");
+  sheet.getRange(1, 17, 1, 1).setValue("Статус изменений");
   //
-  sheet.getRange(1, 17, 1, 1).setValue("Дата проверки");
+  sheet.getRange(1, 18, 1, 1).setValue("Дата проверки");
   //
-  sheet.getRange(1, 18, 1, 1).setValue("Время проверки");
+  sheet.getRange(1, 19, 1, 1).setValue("Время проверки");
 }
 function modifyItem(item, sheet, row_number)
 {
   var id_modified = -1;
   
-  var is_completed = sheet.getRange(row_number, 10, 1, 1).getValues()[0][0];
-  var item_is_completed = item[9];
+  var is_completed = sheet.getRange(row_number, 11, 1, 1).getValues()[0][0];
+  var item_is_completed = item[10];
   if(is_completed != item_is_completed) 
   {
     id_modified = 1;
   }
   //
-  
   var name = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
   var item_name = item[5];
   if(name != item_name) 
@@ -314,60 +348,65 @@ function modifyItem(item, sheet, row_number)
     id_modified = 2;
   }
   //
-  
-  var responsible_uid = sheet.getRange(row_number, 8, 1, 1).getValues()[0][0];
-  var item_responsible_uid = item[7];
+  var responsible_uid = sheet.getRange(row_number, 9, 1, 1).getValues()[0][0];
+  var item_responsible_uid = item[8];
   if(responsible_uid != item_responsible_uid && item_responsible_uid != null) 
   {
     id_modified = 3;
   }
   //
-  
-  var priority = sheet.getRange(row_number, 7, 1, 1).getValues()[0][0];
-  var item_priority = item[6];
+  var priority = sheet.getRange(row_number, 8, 1, 1).getValues()[0][0];
+  var item_priority = item[7];
   if(priority != item_priority) 
   {
     id_modified = 4;
   }
   //
+  item[16] = id_modified.toString();
   if(id_modified > 0) addModifyItem(item, sheet, row_number);
   
 }
-function addModifyItem(item, sheet, row_number)
+function addModifyItem(item, sheet, row_number, id_modified)
 {
   var now = new Date();
     //create date
   sheet.getRange(row_number, 1, 1, 1).setValue(item[0]);
-    //create year
-  sheet.getRange(row_number, 2, 1, 1).setValue(item[1]);
     //date due to
+  sheet.getRange(row_number, 2, 1, 1).setValue(item[1]);
+   //completed date
   sheet.getRange(row_number, 3, 1, 1).setValue(item[2]);
-    //completed date
+  //year completed
   sheet.getRange(row_number, 4, 1, 1).setValue(item[3]);
-    //all day
+  //month completed
   sheet.getRange(row_number, 5, 1, 1).setValue(item[4]);
-    //subject
+    //all day
   sheet.getRange(row_number, 6, 1, 1).setValue(item[5]);
-    //priority
+    //subject
   sheet.getRange(row_number, 7, 1, 1).setValue(item[6]);
+    //priority
+  sheet.getRange(row_number, 8, 1, 1).setValue(item[7]);
     //responsible_uid
-  sheet.getRange(row_number, 8, 1, 1).setValue(item[7].toString());
-    //user_name
   sheet.getRange(row_number, 9, 1, 1).setValue(item[8]);
-    //completed
+    //user_name
   sheet.getRange(row_number, 10, 1, 1).setValue(item[9]);
+    //completed
+  sheet.getRange(row_number, 11, 1, 1).setValue(item[10]);
     //project id
-  sheet.getRange(row_number, 11, 1, 1).setValue(item[10].toString());
-    //project
   sheet.getRange(row_number, 12, 1, 1).setValue(item[11]);
+    //project
+  sheet.getRange(row_number, 13, 1, 1).setValue(item[12]);
     //project parent id
-  sheet.getRange(row_number, 13, 1, 1).setValue(item[12].toString());
+  sheet.getRange(row_number, 14, 1, 1).setValue(item[13]);
     //item id
-  sheet.getRange(row_number, 14, 1, 1).setValue(item[13].toString());
-    //
-  sheet.getRange(row_number, 15, 1, 1).setValue(now);
-  //
-  sheet.getRange(row_number, 16, 1, 1).setValue(now.getTime());
+  sheet.getRange(row_number, 15, 1, 1).setValue(item[14]);
+   //date changes
+  sheet.getRange(row_number, 16, 1, 1).setValue(item[15]);
+  //status changes
+  sheet.getRange(row_number, 17, 1, 1).setValue(item[16]);
+  //date checks
+  sheet.getRange(row_number, 18, 1, 1).setValue(item[17]);
+  //time checks
+  sheet.getRange(row_number, 19, 1, 1).setValue(item[18]);
 }
 function checkItimeId(item_id, sheet, count, check_exists)
 {
@@ -378,8 +417,7 @@ function checkItimeId(item_id, sheet, count, check_exists)
   {
     var sheet_item_id = -1;
     index = -1;
-    sheet_item_id = sheet.getRange(j+1, 14, 1, 1).getValues()[0][0].toString();
-    //sheet_item_id = Number(sheet_item_id);
+    sheet_item_id = sheet.getRange(j+1, 15, 1, 1).getValues()[0][0].toString();
     if(sheet_item_id == item_id)
     {
       index = j+1;
