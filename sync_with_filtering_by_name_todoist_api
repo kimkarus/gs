@@ -22,7 +22,6 @@ function myFunction() {
   var tmp_var3 = getParamValue(3, spreadsheetId);
   var tmp_var4 = getParamValue(4, spreadsheetId);
   //
-  var readdy_urlfetch = checkUrlfetch(spreadsheetId);
   //
   var need_refresh_tasks = false;
   if(ipc_start <=0) need_refresh_tasks = true;
@@ -195,9 +194,9 @@ function checkUrlfetch(spreadsheetId, is_start)
 {
   var tmp_var5 = getParamValue(5, spreadsheetId);
   tmp_var5 = Number(tmp_var5);
+  if(tmp_var5 < 0) tmp_var5 = 0;
   var tmp_var6 = getParamValue(6, spreadsheetId);
   tmp_var6 = Number(tmp_var6);
-  var tmp_var7 = getParamValue(7, spreadsheetId);
   //urlfetch
   var percent = tmp_var5 /  tmp_var6 * 100;
   //
@@ -213,7 +212,7 @@ function checkUrlfetch(spreadsheetId, is_start)
   return(true);
 }
 
-function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshingL) {
+function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshing) {
   if(data == null || data_c == null || data_p == null) return;
   var all_tasks = [];
   var filtered_tasks = [];
@@ -233,14 +232,8 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
   }
   for each(var row in data.items) {
     
-    var item = null;
+    var item = getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing);
     
-    if(completed_tasks){
-      item = getSingleItem(token, row.id, spreadsheetId);
-    } else {
-      item = row;
-    }
-        
     if(item == null) continue;
     var completed = item.checked;
     
@@ -275,7 +268,6 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
       year_added = date_added.getFullYear();
       month_added = date_added.getMonth();
     }
-    var year_added = date_added.getFullYear();
     var now = new Date();
     var now_time = now.getTime();
     
@@ -359,8 +351,52 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
   Logger.log("allTasks: " + all_tasks.length);
   Logger.log("allTasks: " + filtered_tasks.length);
   
-  processTasks(sheet_name, ss, filtered_tasks, false, true);
+  processTasks(sheet_name, ss, filtered_tasks, false, true, spreadsheetId, token);
   
+}
+function getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing)
+{
+  var item = getEmptyItemForTask();
+  
+    if(completed_tasks){
+      if(is_refreshing){
+        item = getSingleItem(token, row.id, spreadsheetId);
+      } else {
+        item = getFillForCompleted(item, row);
+      }      
+    } else {
+      item = row;
+    }
+  //
+  return (item);
+}
+function getEmptyItemForTask()
+{
+   var item = new Object();
+   item.checked = null;
+   item.is_deleted = null;
+   item.labels = null;
+   item.due_date_utc = null;
+   item.date_added = null;
+   item.date_completed = null;
+   item.project_id = null;
+   item.responsible_uid = null;
+   item.all_day = null;
+   item.content = null;
+   item.priority = null;
+   item.id = null;
+  
+  return (item);
+}
+function getFillForCompleted(item, row)
+{
+  //item.responsible_uid = row.user_id;
+  item.user_id = row.user_id;
+  item.id = row.id;
+  item.project_id = row.project_id;
+  item.completed_date = row.completed_date;
+  
+  return (item);
 }
 function getDate(value)
 {
@@ -388,13 +424,13 @@ function getSingleLabel(token, id, spreadsheetId)
   if(data != null) item = data.label;
   return(item);
 }
-function processTasks(sheet_name, ss, arr, clean_range, check_exists)
+function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadsheetId, token)
 {
   var sheet = ss.getSheetByName(sheet_name);
   if(clean_range) sheet.clear();
   setHeader(sheet, ss);
   sortArr(arr, 1);
-  fillSheet(arr, sheet, check_exists);  
+  fillSheet(arr, sheet, check_exists, spreadsheetId, token);  
 }
 function sortArr(arr, indexCol)
 {
@@ -406,7 +442,7 @@ function sortArr(arr, indexCol)
       {return -1;}
   });
 }
-function fillSheet(arr, sheet, check_exists)
+function fillSheet(arr, sheet, check_exists, spreadsheetId, token)
 {
   var maxRows = getMaxCountRows(sheet);
   
@@ -416,7 +452,7 @@ function fillSheet(arr, sheet, check_exists)
     maxRows = getMaxCountRows(sheet);
     var row_number = checkItimeId(arr[index][16], sheet, maxRows, check_exists);
     if(row_number >= 0){
-      modifyItem(arr[index], sheet, row_number);
+      modifyItem(arr[index], sheet, row_number, spreadsheetId, token);
     } else {
       addModifyItem(arr[index], sheet, maxRows+1);
       maxRows = maxRows+1;
@@ -480,7 +516,7 @@ function setHeader(sheet, ss)
   //Labels
   sheet.getRange(1, 27, 1, 1).setValue("Теги:");
 }
-function modifyItem(item, sheet, row_number)
+function modifyItem(item, sheet, row_number, spreadsheetId, token)
 {
   var id_modified = -1;
   
@@ -525,7 +561,9 @@ function modifyItem(item, sheet, row_number)
   }
   //
   item[18] = id_modified.toString();
-  if(id_modified > 0) addModifyItem(item, sheet, row_number);
+  if(id_modified > 0) {
+    addModifyItem(item, sheet, row_number);
+  }
   
 }
 function addModifyItem(item, sheet, row_number, id_modified)
@@ -634,6 +672,7 @@ function getLabelNames(arr, labels, default_name, token, spreadsheetId)
   var name = default_name;
   
   if(arr == null) {
+    arr = new Array();
     arr.push([""]);
     return(arr);
   }
