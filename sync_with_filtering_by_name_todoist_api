@@ -1,5 +1,5 @@
 function myFunction() {
-  var need_projects_name = ["name1", "name2"];
+  var need_projects_name = ["name1", "name2", "Team Inbox"];
   var spreadsheetId = "<sheet id>";
   var default_name = "<default name>";
   var token = '<token>';
@@ -232,114 +232,73 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
   }
   for each(var row in data.items) {
     
-    var item = getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing);
+    var item = getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name);
     
     if(item == null) continue;
-    var completed = item.checked;
     
     if (item.is_deleted == 1) continue;
-    
-    var labels = item.labels;
-    labels = getLabelNames(labels, data_l, "", token, spreadsheetId);
-    
-    var due_date_utc = getDate(item.due_date_utc);
-    var year_due = "";
-    var month_due = "";
-    var date_added = getDate(item.date_added);
-    var year_added = "";
-    var month_added = "";
-    var date_completed = getDate(item.date_completed);
-    var year_completed = "";
-    var month_completed = "";
-    var day_completed = "";
-    var day_of_week_completed = "";
-    if(date_completed != null && date_completed != ""){
-      year_completed = date_completed.getFullYear();
-      month_completed = date_completed.getMonth();
-      day_completed = date_completed.getDate();
-      day_of_week_completed = date_completed.getDay();
-      if(day_of_week_completed == 0) day_of_week_completed = 7;
-    }
-    if(due_date_utc != null && due_date_utc != ""){
-      year_due = due_date_utc.getFullYear();
-      month_due = due_date_utc.getMonth();
-    }
-    if(date_added != null && date_added != ""){
-      year_added = date_added.getFullYear();
-      month_added = date_added.getMonth();
-    }
-    var now = new Date();
-    var now_time = now.getTime();
-    
-    var project = getProject(data_p.projects, item.project_id);
-    var user_name = getUserName(data_c.collaborators, item.responsible_uid, default_name);
-    //
-    var project_name = "";
-    var responsible_uid = 0;
-    if(item.responsible_uid != null) responsible_uid = item.responsible_uid;
-    if(project!=null) project_name = project.name;
-    
+               
     all_tasks.push([
-           date_added,
-           due_date_utc,
-           date_completed,
-           year_completed.toString(),
-           month_completed.toString(),
-           day_completed.toString(),
-           day_of_week_completed,
+           item.date_added,
+           item.due_date_utc,
+           item.date_completed,
+           item.year_completed,
+           item.month_completed,
+           item.day_completed,
+           item.day_of_week_completed,
            item.all_day, 
            item.content,
            item.priority,
-           responsible_uid.toString(),
-           user_name, 
-           completed,
-           item.project_id.toString(),
-           project_name,
+           item.responsible_uid,
+           item.user_name, 
+           item.completed,
+           item.project_id,
+           item.project_name,
            "",
-           item.id.toString(),
-           now,
+           item.id,
+           item.now,
            "",
-           now,
-           now_time,
-           year_added,
-           month_added,
-           year_due,
-           month_due,
+           item.now,
+           item.now_time,
+           item.year_added,
+           item.month_added,
+           item.year_due,
+           item.month_due,
            1,
-           labels
+           item.labels
          ]);
     
     is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
 
          filtered_tasks.push([
-           date_added,
-           due_date_utc,
-           date_completed,
-           year_completed.toString(),
-           month_completed.toString(),
-           day_completed.toString(),
-           day_of_week_completed,
+           item.date_added,
+           item.due_date_utc,
+           item.date_completed,
+           item.year_completed,
+           item.month_completed,
+           item.day_completed,
+           item.day_of_week_completed,
            item.all_day, 
            item.content,
            item.priority,
-           responsible_uid.toString(),
-           user_name, 
-           completed,
-           item.project_id.toString(),
-           project_name,
+           item.responsible_uid,
+           item.user_name, 
+           item.completed,
+           item.project_id,
+           item.project_name,
            "",
-           item.id.toString(),
-           now,
+           item.id,
+           item.now,
            "",
-           now,
-           now_time,
-           year_added,
-           month_added,
-           year_due,
-           month_due,
+           item.now,
+           item.now_time,
+           item.year_added,
+           item.month_added,
+           item.year_due,
+           item.month_due,
            1,
-           labels
+           item.labels
          ]);
   }
   //
@@ -354,37 +313,102 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
   processTasks(sheet_name, ss, filtered_tasks, false, true, spreadsheetId, token);
   
 }
-function getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing)
+function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name)
 {
-  var item = getEmptyItemForTask();
+  var item_new = getEmptyItemForTask();
   
-    if(completed_tasks){
-      if(is_refreshing){
-        item = getSingleItem(token, row.id, spreadsheetId);
-      } else {
-        item = getFillForCompleted(item, row);
-      }      
+  if(completed_tasks){
+    if(is_refreshing){
+      item_new = getSingleItem(token, item.id, spreadsheetId);
     } else {
-      item = row;
-    }
+      item_new = getFillForCompleted(item_new, item);
+    }      
+  }
   //
-  return (item);
+  item_new.due_date_utc = getDate(item.due_date_utc);
+  item_new.date_added = getDate(item.date_added);
+  item_new.date_completed = getDate(item.date_completed);
+  
+  if(item_new.date_completed != null && item_new.date_completed != ""){
+    item_new.year_completed = item_new.date_completed.getFullYear();
+    item_new.year_completed = item_new.year_completed.toString();
+    item_new.month_completed = item_new.date_completed.getMonth() + 1;
+    item_new.month_completed = item_new.month_completed.toString();
+    item_new.day_completed = item_new.date_completed.getDate() + 1;
+    item_new.day_completed = item_new.day_completed.toString();
+    item_new.day_of_week_completed = item_new.date_completed.getDay() + 1;
+    if(item_new.day_of_week_completed == 0) item_new.day_of_week_completed = 7;
+    item_new.day_of_week_completed = item_new.day_of_week_completed.toString();
+  }
+  if(item_new.due_date_utc != null && item_new.due_date_utc != ""){
+    item_new.year_due = item_new.due_date_utc.getFullYear();
+    item_new.year_due = item_new.year_due.toString();
+    item_new.month_due = item_new.due_date_utc.getMonth() + 1;
+    item_new.month_due = item_new.month_due.toString();
+  }
+  if(item_new.date_added != null && item_new.date_added != ""){
+    item_new.year_added = item_new.date_added.getFullYear();
+    item_new.year_added = item_new.year_added.toString();
+    item_new.month_added = item_new.date_added.getMonth() + 1;
+    item_new.month_added = item_new.month_added.toString();
+  }
+  item_new.now = new Date();
+  item_new.now_time = item_new.now.getTime();
+  //
+  item_new.project_id = item.project_id;
+  var project = getProject(data_p.projects, item_new.project_id);
+  item_new.user_name = getUserName(data_c.collaborators, item.responsible_uid, default_name);
+  //
+  if(item.responsible_uid != null) item_new.responsible_uid = item.responsible_uid;
+  if(project!=null) item_new.project_name = project.name;
+  //
+  item_new.labels = getLabelNames(item.labels, data_l, "", token, spreadsheetId);
+  item_new.content = item.content;
+  item_new.all_day = item.all_day;
+  //
+  item_new.completed = item.checked;
+  item_new.is_deleted = item.is_deleted;
+  item_new.id = item.id.toString();
+  item_new.project_id = item_new.project_id.toString();
+  item_new.responsible_uid = item_new.responsible_uid.toString();  
+  //
+  return (item_new);
 }
 function getEmptyItemForTask()
 {
-   var item = new Object();
-   item.checked = null;
-   item.is_deleted = null;
-   item.labels = null;
-   item.due_date_utc = null;
-   item.date_added = null;
-   item.date_completed = null;
-   item.project_id = null;
-   item.responsible_uid = null;
-   item.all_day = null;
-   item.content = null;
-   item.priority = null;
-   item.id = null;
+  var item = new Object();
+  item.checked = null;
+  item.is_deleted = null;
+  item.labels = null;
+  item.due_date_utc = null;
+  item.date_added = null;
+  item.date_completed = null;
+  item.project_id = null;
+  item.responsible_uid = null;
+  item.all_day = null;
+  item.content = null;
+  item.priority = null;
+  item.id = null;
+  item.due_date_utc = "";
+  item.year_due = "";
+  item.date_added = "";
+  item.year_added = "";
+  item.month_added = "";
+  item.date_completed = "";
+  item.year_completed = "";
+  item.month_completed = "";
+  item.day_completed = "";
+  item.day_of_week_completed = "";
+  item.now = "";
+  item.now_item = "";
+  item.user_name = "";
+  item.project_name = "";
+  item.responsible_uid = 0;
+  item.labels = null;
+  item.checked = false;
+  item.is_deleted = 0;
+  item.content = "";
+  item.all_day = true;
   
   return (item);
 }
