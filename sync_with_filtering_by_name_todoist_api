@@ -445,19 +445,40 @@ function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadshee
 function fillSheet(arr, sheet, check_exists, spreadsheetId, token)
 {
   var maxRows = getMaxCountRows(sheet);
-  
+  var sheet_values = sheet.getDataRange().getValues();
   for (i = 0; i < arr.length; i++)
   {
     var index = i;
     maxRows = getMaxCountRows(sheet);
-    var row_number = checkItimeId(arr[index][16], sheet, maxRows, check_exists);
+    var row_number = checkItimeId(arr[index][16], sheet_values, maxRows, check_exists);
     if(row_number >= 0){
-      modifyItem(arr[index], sheet, row_number, spreadsheetId, token);
+      sheet_values = modifyItem(arr[index], sheet, row_number, spreadsheetId, token, sheet_values);
+    } 
+  }
+  //
+  var range = sheet.getDataRange();
+  try{
+    range.setValues(sheet_values);
+  } catch(e){
+    Logger.log("error: " + e);
+  }
+  //
+  for (i = 0; i < arr.length; i++)
+  {
+    var index = i;
+    maxRows = getMaxCountRows(sheet);
+    var row_number = checkItimeId(arr[index][16], sheet_values, maxRows, check_exists);
+    if(row_number >= 0){
+      //modifyItem(arr[index], sheet, row_number, spreadsheetId, token, sheet_values);
     } else {
       addModifyItem(arr[index], sheet, maxRows+1);
       maxRows = maxRows+1;
+      sheet_values = sheet.getDataRange().getValues();
     }
   }
+  
+  
+  //sheet.getDataRange().setValues(sheet_values);
 }
 function setHeader(sheet, ss)
 {
@@ -516,60 +537,93 @@ function setHeader(sheet, ss)
   //Labels
   sheet.getRange(1, 27, 1, 1).setValue("Теги:");
 }
-function modifyItem(item, sheet, row_number, spreadsheetId, token)
+function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
 {
   var id_modified = -1;
   
-  var is_completed = sheet.getRange(row_number, 13, 1, 1).getValues()[0][0];
+  //var is_completed = sheet.getRange(row_number, 13, 1, 1).getValues()[0][0];
+  var is_completed = sheet_values[row_number][12];
   var item_is_completed = item[12];
   if(is_completed != item_is_completed) 
   {
     id_modified = 1;
   }
   //
-  var name = sheet.getRange(row_number, 9, 1, 1).getValues()[0][0];
+  //var name = sheet.getRange(row_number, 9, 1, 1).getValues()[0][0];
+  var name = sheet_values[row_number][8];
   var item_name = item[8];
   if(name != item_name) 
   {
     id_modified = 2;
   }
   //
-  var responsible_uid = sheet.getRange(row_number, 11, 1, 1).getValues()[0][0];
+  //var responsible_uid = sheet.getRange(row_number, 11, 1, 1).getValues()[0][0];
+  var responsible_uid = sheet_values[row_number][10];
   var item_responsible_uid = item[10];
   if(responsible_uid != item_responsible_uid && item_responsible_uid != null) 
   {
     id_modified = 3;
   }
   //
-  var priority = sheet.getRange(row_number, 10, 1, 1).getValues()[0][0];
+  //var priority = sheet.getRange(row_number, 10, 1, 1).getValues()[0][0];
+  var priority = sheet_values[row_number][9];
   var item_priority = item[9];
   if(priority != item_priority) 
   {
     id_modified = 4;
   }
-  var day_completed = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
+  //var day_completed = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
+  var day_completed = sheet_values[row_number][5];
   var item_day_completed = item[5];
   if(day_completed != item_day_completed) 
   {
     id_modified = 5;
   }
-  var label = sheet.getRange(row_number, 27, 1, 1).getValues()[0][0];
+  if(id_modified > 0){
+    for(var j = 0; j < 26; j++){
+      sheet_values[row_number][j] = item[j];
+    }
+  }
+  //var label = sheet.getRange(row_number, 27, 1, 1).getValues()[0][0];
+  var label = sheet_values[row_number][26];
   var item_label = item[26][0];
   if(label != item_label) 
   {
     id_modified = 7;
+    var labels = item[26];
+    var index_col_start = 26;
+    if(labels != null){
+      var count_l = labels.length;
+      if(count_l > 0){
+        for (var i = 0; i < count_l; i++){
+          var label = labels[i].toString();
+          sheet_values[row_number, index_col_start] = label;
+        }
+      }
+    }
   }
   //
   item[18] = id_modified.toString();
+  
   if(id_modified > 0) {
-    addModifyItem(item, sheet, row_number);
+    sheet_values[row_number][18] = item[18];
+    //addModifyItem(item, sheet, row_number, sheet_values);
+  }
+  return (sheet_values);
+}
+function addModifyItem(item, sheet, row_number, id_modified, sheet_values)
+{
+  var now = new Date();
+  if(id_modified != "" || id_modified != null){
+    //sheet.getDataRange().setValues(sheet_values);
+  } else {
+    addNewItem(item, sheet, row_number, id_modified);
   }
   
 }
-function addModifyItem(item, sheet, row_number, id_modified)
+function addNewItem(item, sheet, row_number, id_modified)
 {
-  var now = new Date();
-    //create date
+  //create date
   sheet.getRange(row_number, 1, 1, 1).setValue(item[0]);
     //date due to
   sheet.getRange(row_number, 2, 1, 1).setValue(item[1]);
@@ -634,7 +688,7 @@ function addModifyItem(item, sheet, row_number, id_modified)
     }
   }
 }
-function checkItimeId(item_id, sheet, count, check_exists)
+function checkItimeId(item_id, sheet_values, count, check_exists)
 {
   var index = -1;
   if(!check_exists) return(index);
@@ -643,7 +697,8 @@ function checkItimeId(item_id, sheet, count, check_exists)
   {
     var sheet_item_id = -1;
     index = -1;
-    sheet_item_id = sheet.getRange(j+1, 17, 1, 1).getValues()[0][0].toString();
+    if(sheet_values[j][16] == null || sheet_values[j][16] == "") continue;
+    sheet_item_id = sheet_values[j][16].toString();
     if(sheet_item_id == item_id)
     {
       index = j+1;
