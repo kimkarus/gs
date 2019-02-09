@@ -216,102 +216,76 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
   if(data == null || data_c == null || data_p == null) return;
   var all_tasks = [];
   var filtered_tasks = [];
-  var accept_project_entries = [];
-  for each(var need_project_name in need_projects_name){
-    for each(var project in data_p.projects){
-      if(project.is_deleted == 1) continue;
-      if(accept_project_entries.length > 0){
-        if(!checkAcceptProjectsId(accept_project_entries, project.parent_id)) continue;
-        if(checkAcceptProjectsId(accept_project_entries, project.id)) continue;
-        accept_project_entries.push(project.id);
-      } else {
-        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
-        accept_project_entries.push(project.id);
-      }
-    }
-  }
+  var accept_project_entries = getAcceptProjects(need_projects_name, data_p);
+  
   for each(var row in data.items) {
-    
     var item = getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name);
-    
     if(item == null) continue;
-    
     if (item.is_deleted == 1) continue;
-               
-    all_tasks.push([
-           item.date_added,
-           item.due_date_utc,
-           item.date_completed,
-           item.year_completed,
-           item.month_completed,
-           item.day_completed,
-           item.day_of_week_completed,
-           item.all_day, 
-           item.content,
-           item.priority,
-           item.responsible_uid,
-           item.user_name, 
-           item.completed,
-           item.project_id,
-           item.project_name,
-           "",
-           item.id,
-           item.now,
-           "",
-           item.now,
-           item.now_time,
-           item.year_added,
-           item.month_added,
-           item.year_due,
-           item.month_due,
-           1,
-           item.labels
-         ]);
-    
+    all_tasks = insertItemArray(all_tasks, item);           
     is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
-
-         filtered_tasks.push([
-           item.date_added,
-           item.due_date_utc,
-           item.date_completed,
-           item.year_completed,
-           item.month_completed,
-           item.day_completed,
-           item.day_of_week_completed,
-           item.all_day, 
-           item.content,
-           item.priority,
-           item.responsible_uid,
-           item.user_name, 
-           item.completed,
-           item.project_id,
-           item.project_name,
-           "",
-           item.id,
-           item.now,
-           "",
-           item.now,
-           item.now_time,
-           item.year_added,
-           item.month_added,
-           item.year_due,
-           item.month_due,
-           1,
-           item.labels
-         ]);
+    filtered_tasks = insertItemArray(filtered_tasks, item);  
   }
   //
-
   var ss = SpreadsheetApp.openById(spreadsheetId);
-  
-  
   var idRowStart = 2; 
   Logger.log("allTasks: " + all_tasks.length);
   Logger.log("allTasks: " + filtered_tasks.length);
-  
   processTasks(sheet_name, ss, filtered_tasks, false, true, spreadsheetId, token);
   
+}
+function getAcceptProjects(need_projects_name, data_p)
+{
+  var arr = [];
+  for each(var need_project_name in need_projects_name){
+    for each(var project in data_p.projects){
+      if(project.is_deleted == 1) continue;
+      if(arr.length > 0){
+        if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
+        if(checkAcceptProjectsId(arr, project.id)) continue;
+        arr.push(project.id);
+      } else {
+        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
+        arr.push(project.id);
+      }
+    }
+  }
+  return (arr);
+}
+function insertItemArray(arr, item)
+{
+  arr.push([
+           item.date_added,
+           item.due_date_utc,
+           item.date_completed,
+           item.year_completed,
+           item.month_completed,
+           item.day_completed,
+           item.day_of_week_completed,
+           item.all_day, 
+           item.content,
+           item.priority,
+           item.responsible_uid,
+           item.user_name, 
+           item.completed,
+           item.project_id,
+           item.project_name,
+           "",
+           item.id,
+           item.now,
+           "",
+           item.now,
+           item.now_time,
+           item.year_added,
+           item.month_added,
+           item.year_due,
+           item.month_due,
+           1,
+           item.labels
+         ]);
+  
+  return (arr);
 }
 function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name)
 {
@@ -453,18 +427,7 @@ function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadshee
   var sheet = ss.getSheetByName(sheet_name);
   if(clean_range) sheet.clear();
   setHeader(sheet, ss);
-  sortArr(arr, 1);
   fillSheet(arr, sheet, check_exists, spreadsheetId, token);  
-}
-function sortArr(arr, indexCol)
-{
-  // Sort tasks by due date [indexCol]
-  arr.sort(function(a,b) {
-    if (b[indexCol] < a[indexCol]) 
-      {return 1;} 
-    else 
-      {return -1;}
-  });
 }
 function fillSheet(arr, sheet, check_exists, spreadsheetId, token)
 {
