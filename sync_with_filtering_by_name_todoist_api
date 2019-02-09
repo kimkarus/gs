@@ -6,6 +6,7 @@ function myFunction() {
   var api_URL = "https://todoist.com/API/v7/sync";
   var api_URL_completed_get_all = "https://todoist.com/api/v7/completed/get_all";
   var api_URL_V8 = "https://beta.todoist.com/API/v8/";
+  initializeSheets(spreadsheetId);
   if(!checkUrlfetch(spreadsheetId, true)) return;
   var data_c = getResource(api_URL, token, 7, '["collaborators"]', null, null, null, spreadsheetId);
   var data_p = getResource(api_URL, token, 7, '["projects"]', null, null, null, spreadsheetId);
@@ -42,6 +43,18 @@ function myFunction() {
     setParamConfig("completed_tasks_ipc", ipc, 1, spreadsheetId);
     if(data_completed_tasks==null) break;
     grabTasks(data_completed_tasks, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, true, default_name, "Work", false);
+  }
+}
+function initializeSheets(spreadsheetId)
+{
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  checkExistenceSheets(ss, "config");
+  checkExistenceSheets(ss, "Work");
+}
+function checkExistenceSheets(ss, sheet_name)
+{
+  if (ss.getSheetByName(sheet_name) == null){
+    ss.insertSheet(sheet_name);
   }
 }
 function setParamConfig(param_name, value, column_number, spreadsheetId)
