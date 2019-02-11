@@ -66,7 +66,7 @@ function sortTasks(arr, arr_days, type)
 {
   var arr_move = [];
   var arr_change = [];
-  
+  type = type.toUpperCase();
   //
   var now = new Date();
   var now_day = getWeekDay(now);
@@ -89,79 +89,85 @@ function sortTasks(arr, arr_days, type)
   }
   //
   for(var i = 0; i < arr_days.length; i++){
+    
       for(var j = arr_days[i].items.length - 1; j >= 0; j--){
         var need_change = false;
-        if(arr_days[i].items[j].priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1){
+        if(arr_days[i].items[j].priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1 && !need_change){
           need_change = true;
-          arr_days[i].count_p1--;
         }
-        if(arr_days[i].items[j].priority == 2 && arr_days[i].count_p2 > arr_days[i].max_p2){
+        if(arr_days[i].items[j].priority == 2 && arr_days[i].count_p2 > arr_days[i].max_p2 && !need_change){
           need_change = true;
-          arr_days[i].count_p2--;
         }
-        if(arr_days[i].items[j].priority == 3 && arr_days[i].count_p3 > arr_days[i].max_p3){
+        if(arr_days[i].items[j].priority == 3 && arr_days[i].count_p3 > arr_days[i].max_p3 && !need_change){
           need_change = true;
-          arr_days[i].count_p3--;
         }
-        if(arr_days[i].items[j].priority == 4 && arr_days[i].count_p4 > arr_days[i].max_p4){
+        if(arr_days[i].items[j].priority == 4 && arr_days[i].count_p4 > arr_days[i].max_p4 && !need_change){
           need_change = true;
-          arr_days[i].count_p4--;
         }
         if(need_change){
+          if(arr_days[i].items[j].priority == 1) arr_days[i].count_p1--;
+          if(arr_days[i].items[j].priority == 2) arr_days[i].count_p2--;
+          if(arr_days[i].items[j].priority == 3) arr_days[i].count_p3--;
+          if(arr_days[i].items[j].priority == 4) arr_days[i].count_p4--;
+          arr_days[i].day_count--;
           arr_change.push(arr_days[i].items[j]);
           arr_days[i].items.splice(j, 1);
           j = arr_days[i].items.length - 1;
-          arr_days[i].day_count--;
         }
       }
   }
-
   for (var i = 0; i < arr_change.length; i++){
     var need_change = false;
     arr_change[i].due_date_utc = date_next_week;
+    if(type == "WORK" && arr_change[i].day_of_week_due >= 6) continue;
     for(var j = 0; j < arr_days.length; j++){
+      
       if(arr_days[j].day_count < arr_days[j].day_max){
         
-        if(arr_change[i].priority == 1 && (arr_days[j].count_p1 + 1) <= arr_days[j].max_p1){
-          arr_days[j].count_p1++;
+        if(arr_change[i].priority == 1 && (arr_days[j].count_p1 + 1) <= arr_days[j].max_p1 && !need_change){
           need_change = true;
         }
-        if(arr_change[i].priority == 2 && (arr_days[j].count_p2 + 1) <= arr_days[j].max_p2){
-          arr_days[j].count_p2++;
+        if(arr_change[i].priority == 2 && (arr_days[j].count_p2 + 1) <= arr_days[j].max_p2 && !need_change){
           need_change = true;
         }
-        if(arr_change[i].priority == 3 && (arr_days[j].count_p3 + 1) <= arr_days[j].max_p3){
-          arr_days[j].count_p3++;
+        if(arr_change[i].priority == 3 && (arr_days[j].count_p3 + 1) <= arr_days[j].max_p3 && !need_change){
           need_change = true;
         }
-        if(arr_change[i].priority == 4 && (arr_days[j].count_p4 + 1) <= arr_days[j].max_p4){
-          arr_days[j].count_p4++;
+        if(arr_change[i].priority == 4 && (arr_days[j].count_p4 + 1) <= arr_days[j].max_p4 && !need_change){
           need_change = true;
         }
         if(need_change){
+          if(arr_change[i].priority == 1) arr_days[j].count_p1++;
+          if(arr_change[i].priority == 2) arr_days[j].count_p2++;
+          if(arr_change[i].priority == 3) arr_days[j].count_p3++;
+          if(arr_change[i].priority == 4) arr_days[j].count_p4++;
           arr_days[j].day_count++;
           arr_change[i].due_date_utc = arr_days[j].date;
+          break;
         }
       }
+      
     }
     //
     if(!need_change){
       for(var j = 0; j < arr_days.length; j++){
         if(arr_days[j].day_count < arr_days[j].day_max){
-          if(arr_change[i].priority == 4 && (arr_days[j].day_count + 1) <= arr_days[j].day_max){
-            arr_days[j].count_p4++;
+          if(arr_change[i].priority == 4 && (arr_days[j].day_count + 1) <= arr_days[j].day_max && !need_change){
             need_change = true;
           }
-          if(arr_change[i].priority == 3 && (arr_days[j].day_count + 1) <= arr_days[j].day_max){
-            arr_days[j].count_p3++;
+          if(arr_change[i].priority == 3 && (arr_days[j].day_count + 1) <= arr_days[j].day_max && !need_change){
             need_change = true;
           }
           if(need_change){
+            if(arr_change[i].priority == 3) arr_days[j].count_p3++;
+            if(arr_change[i].priority == 4) arr_days[j].count_p4++;
             arr_days[j].day_count++;
             arr_change[i].due_date_utc = arr_days[j].date;
+            break;
           }
         }
       }
+      
     }
   }
   //
@@ -477,7 +483,7 @@ function getEmptyItemForTask()
   item.responsible_uid = null;
   item.all_day = null;
   item.content = null;
-  item.priority = null;
+  item.priority = 1;
   item.id = null;
   item.now = "";
   item.now_item = "";
@@ -604,7 +610,7 @@ function createDayOfWeek(day, day_max, p, date)
 {
   var obj = new Object();
   
-  obj.day = day;
+  obj.day = Number(day);
   obj.day_max = day_max;
   obj.day_count = 0;
   var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
