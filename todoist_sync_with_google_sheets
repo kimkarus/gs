@@ -93,12 +93,12 @@ function getResource(apiURL, token, api_version, resource_type, ipc, id, field_n
 function getOptions(payload)
 {
   var options =
-          {
-            method : "get",
-            payload : payload,
-            contentType: 'application/x-www-form-urlencoded',
-            muteHttpExceptions : true
-          };
+      {
+        method : "get",
+        payload : payload,
+        contentType: 'application/x-www-form-urlencoded',
+        muteHttpExceptions : true
+      };
   
   return(options);
 }
@@ -107,30 +107,30 @@ function getPayloadV7(resource_type, token, ipc, id, field_name)
   var payload = null;
   if(ipc != null){
     payload =
-          {
-            "token" : token,
-            "sync_token": '*',
-            "resource_types" : resource_type,
-            "offset" : ipc.toString()
-            
-          };
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
   } else {
     if(id != null){
       if(field_name == "item_id")
       {
         payload =
-        {
-          "token" : token,
-          "item_id" : id.toString()
-        };
+          {
+            "token" : token,
+            "item_id" : id.toString()
+          };
       }
       if(field_name == "label_id")
       {
         payload =
-        {
-          "token" : token,
-          "label_id" : id.toString()
-        };
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
       }
       
     } else {
@@ -150,30 +150,30 @@ function getPayloadV8(resource_type, token, ipc, id, field_name)
   var payload = null;
   if(ipc != null){
     payload =
-          {
-            "token" : token,
-            "sync_token": '*',
-            "resource_types" : resource_type,
-            "offset" : ipc.toString()
-            
-          };
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
   } else {
     if(id != null){
       if(field_name == "item_id")
       {
         payload =
-        {
-          "token" : token,
-          "item_id" : id.toString()
-        };
+          {
+            "token" : token,
+            "item_id" : id.toString()
+          };
       }
       if(field_name == "label_id")
       {
         payload =
-        {
-          "token" : token,
-          "label_id" : id.toString()
-        };
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
       }
       
     } else {
@@ -236,7 +236,7 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
     if(item == null) continue;
     if (item.is_deleted == 1) continue;
     all_tasks = insertItemArray(all_tasks, item);           
-    is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
+    var is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
     filtered_tasks = insertItemArray(filtered_tasks, item);  
   }
@@ -255,9 +255,13 @@ function getAcceptProjects(need_projects_name, data_p)
     for each(var project in data_p.projects){
       if(project.is_deleted == 1) continue;
       if(arr.length > 0){
-        if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
-        if(checkAcceptProjectsId(arr, project.id)) continue;
-        arr.push(project.id);
+        if(project.name.toUpperCase() == need_project_name.toUpperCase()){
+          arr.push(project.id);
+        } else {
+          if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
+          if(checkAcceptProjectsId(arr, project.id)) continue;
+          arr.push(project.id);
+        }
       } else {
         if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
         arr.push(project.id);
@@ -269,34 +273,34 @@ function getAcceptProjects(need_projects_name, data_p)
 function insertItemArray(arr, item)
 {
   arr.push([
-           item.date_added,
-           item.due_date_utc,
-           item.date_completed,
-           item.year_completed,
-           item.month_completed,
-           item.day_completed,
-           item.day_of_week_completed,
-           item.all_day, 
-           item.content,
-           item.priority,
-           item.responsible_uid,
-           item.user_name, 
-           item.completed,
-           item.project_id,
-           item.project_name,
-           "",
-           item.id,
-           item.now,
-           "",
-           item.now,
-           item.now_time,
-           item.year_added,
-           item.month_added,
-           item.year_due,
-           item.month_due,
-           1,
-           item.labels
-         ]);
+    item.date_added,
+    item.due_date_utc,
+    item.date_completed,
+    item.year_completed,
+    item.month_completed,
+    item.day_completed,
+    item.day_of_week_completed,
+    item.all_day, 
+    item.content,
+    item.priority,
+    item.responsible_uid,
+    item.user_name, 
+    item.completed,
+    item.project_id,
+    item.project_name,
+    "",
+    item.id,
+    item.now,
+    "",
+    item.now,
+    item.now_time,
+    item.year_added,
+    item.month_added,
+    item.year_due,
+    item.month_due,
+    1,
+    item.labels
+  ]);
   
   return (arr);
 }
@@ -357,7 +361,8 @@ function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing,
   item_new.is_deleted = item.is_deleted;
   item_new.id = item.id.toString();
   item_new.project_id = item_new.project_id.toString();
-  item_new.responsible_uid = item_new.responsible_uid.toString();  
+  item_new.responsible_uid = item_new.responsible_uid.toString();
+  item_new.priority = item.priority; 
   //
   return (item_new);
 }
@@ -581,6 +586,7 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
   }
   if(id_modified > 0){
     for(var j = 0; j < 26; j++){
+      if(item[j] == "" || item[j] == null) continue;
       sheet_values[row_number][j] = item[j];
     }
   }
