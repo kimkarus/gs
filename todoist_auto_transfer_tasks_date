@@ -1,10 +1,10 @@
 function myFunction() {
-  var spreadsheetId = "1fdVuNRwco5FBUHRdTJF0R7_fa-BhU4L6AFCp5F8jDCw";
+  var spreadsheetId = "<sheet id>";
   //
   var need_projects_name_for_home = getProjectsForHome(spreadsheetId);
   var need_projects_name_for_work = getProjectsForWork(spreadsheetId);
-  var default_name = "Ilya Kosarev";
-  var token = '8213f1af3aa3e9723a647e4433b4910c33d07497';
+  var default_name = "<default name>";
+  var token = '<token>';
   var api_URL = "https://todoist.com/API/v7/sync";
   var api_URL_completed_get_all = "https://todoist.com/api/v7/completed/get_all";
   var api_URL_V8 = "https://beta.todoist.com/API/v8/";
