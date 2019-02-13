@@ -43,10 +43,6 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
 }
 function processTasks(arr, check_exists, spreadsheetId, token, type)
 {
-  //var sheet = ss.getSheetByName(sheet_name);
-  //if(clean_range) sheet.clear();
-  //setHeader(sheet, ss);
-  //fillSheet(arr, null, check_exists, spreadsheetId, token);
   var p = getP(spreadsheetId, type);
   var day_max = getMaxDay(spreadsheetId, type);
   var now = new Date();
@@ -58,9 +54,7 @@ function processTasks(arr, check_exists, spreadsheetId, token, type)
 }
 function moveTasks(arr, token, spreadsheetId, type)
 {
-  //for each(var row in arr){
-    updateTasks('["items"]', "item_update", token, arr, spreadsheetId);
-  //}
+  updateTasks('["items"]', "item_update", token, arr, spreadsheetId);
 }
 function sortTasks(arr, arr_days, type)
 {
@@ -72,11 +66,11 @@ function sortTasks(arr, arr_days, type)
   var now_day = getWeekDay(now);
   var now_month = now.getMonth() + 1;
   //var firstDay = new Date(now.getFullYear(), now.getMonth(), 1); // return first day of the month
-  var now_week = getNumberString(Utilities.formatDate(now, "GMT", "w")); 
+  var now_week = getWeekNumber(now); 
   var date_next_week = getDate(getDateNextWeek(now));
+  var count_previous_days = getNumberString(getParamValue(9, spreadsheetId, 2));
   //
-  for each(var row in arr){
-    var item = row[0];
+  for each(var item in arr){
     if(item.week_due > now_week) continue;
     var index = item.day_of_week_due-1;
     if(index < 0) continue;
@@ -92,6 +86,12 @@ function sortTasks(arr, arr_days, type)
     
       for(var j = arr_days[i].items.length - 1; j >= 0; j--){
         var need_change = false;
+        if(arr_days[i].day < now_day - count_previous_days){
+          need_change = true;
+        }
+        if(type == "WORK" && arr_days[i].day >= 6 && !need_change){
+          need_change = true;
+        }
         if(arr_days[i].items[j].priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1 && !need_change){
           need_change = true;
         }
@@ -116,12 +116,15 @@ function sortTasks(arr, arr_days, type)
         }
       }
   }
+  var t1 = "";
   for (var i = 0; i < arr_change.length; i++){
     var need_change = false;
     arr_change[i].due_date_utc = date_next_week;
-    if(type == "WORK" && arr_change[i].day_of_week_due >= 6) continue;
+    //
+    if(arr_change[i].day_of_week_due  < now_day - count_previous_days) continue;
+    if(type == "WORK" && arr_change[i].day_of_week_due >= 6 && !need_change) continue;
     for(var j = 0; j < arr_days.length; j++){
-      
+
       if(arr_days[j].day_count < arr_days[j].day_max){
         
         if(arr_change[i].priority == 1 && (arr_days[j].count_p1 + 1) <= arr_days[j].max_p1 && !need_change){
@@ -280,7 +283,7 @@ function getCommands(items, type, max_count)
     //var args = [];
     var args = {
       "id": item.id.toString(), 
-      "due_date_utc": Utilities.formatDate(item.due_date_utc, "GMT", 'yyyy-MM-dd\'T\'HH:mm').toString()
+      "due_date_utc": getDatePost(item.due_date_utc)
     };
     //args.push(arg);
     //
@@ -376,9 +379,7 @@ function getProjectsForWork(spreadsheetId)
 }
 function insertItemArray(arr, item)
 {
-  arr.push([
-    item
-  ]);
+  arr.push(item);
   
   return (arr);
 }
@@ -408,7 +409,7 @@ function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing,
     item_new.day_of_week_completed = item_new.date_completed.getDay();
     if(item_new.day_of_week_completed == 0) item_new.day_of_week_completed = 7;
     item_new.day_of_week_completed = item_new.day_of_week_completed.toString();
-    item_new.week_completed = getNumberString(Utilities.formatDate(item_new.date_completed, "GMT", "w"));
+    item_new.week_completed = getWeekNumber(item_new.date_completed);
   }
   if(item_new.due_date_utc != null && item_new.due_date_utc != ""){
     item_new.year_due = item_new.due_date_utc.getFullYear();
@@ -418,14 +419,14 @@ function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing,
     item_new.day_due = item_new.due_date_utc.getDate();
     item_new.day_completed = item_new.due_date_utc.toString();
     item_new.day_of_week_due = getWeekDay(item_new.due_date_utc);
-    item_new.week_due = getNumberString(Utilities.formatDate(item_new.due_date_utc, "GMT", "w"));
+    item_new.week_due = getWeekNumber(item_new.due_date_utc);
   }
   if(item_new.date_added != null && item_new.date_added != ""){
     item_new.year_added = item_new.date_added.getFullYear();
     item_new.year_added = item_new.year_added.toString();
     item_new.month_added = item_new.date_added.getMonth();
     item_new.month_added = item_new.month_added.toString();
-    item_new.week_added = getNumberString(Utilities.formatDate(item_new.date_added, "GMT", "w"));
+    item_new.week_added = getWeekNumber(item_new.date_added);
   }
   item_new.now = new Date();
   item_new.now_time = item_new.now.getTime();
@@ -702,6 +703,18 @@ function getDate(value)
     }
   return(new_value);
 }
+function getWeekNumber(value)
+{
+  if(value == null || value == "") return (null);
+  value = getNumberString(Utilities.formatDate(value, "GMT", "w"));
+  return (value);
+}
+function getDatePost(value)
+{
+  if(value == null || value == "") return (null);
+  value = Utilities.formatDate(value, "GMT", 'yyyy-MM-dd\'T\'HH:mm').toString();
+  return (value);
+}
 function getProject(arr, need_id)
 {
   var obj = null;
@@ -742,8 +755,10 @@ function getDateNextWeek(date)
   var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
   
   var now_day = getWeekDay(date);
+  var div = 8 - now_day;
+  date = getDate(date);
   //
-  var next_week = new Date(date.getTime() + (8 - now_day) * MILLIS_PER_DAY);
+  var next_week = new Date(date.getTime() + div * MILLIS_PER_DAY);
   return (next_week);
   
 }
