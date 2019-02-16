@@ -1,0 +1,641 @@
+function getResource(apiURL, token, api_version, resource_type, ipc, id, field_name, spreadsheetId, config){
+  var payload = null;
+  if(api_version == 7){
+    payload = getPayloadV7(resource_type, token, ipc, id, field_name);
+  }
+  if(api_version == 8){
+    payload = getPayloadV8(resource_type, token, ipc, id, field_name);
+  }
+  if(api_version == 8){
+    apiURL = apiURL+resource_type;
+  }
+   var options = getOptions(payload);
+   var content = getResponseContent(apiURL, options, spreadsheetId, config);
+
+  return(content);
+}
+function getOptions(payload, method, commands)
+{
+  if(method == null || method == "") method = "get";
+  var options = null;
+
+  options = {
+    method : method,
+    payload : payload,
+    contentType: 'application/x-www-form-urlencoded',
+    muteHttpExceptions : true
+  };
+
+  return(options);
+}
+function getPayloadV7(resource_type, token, ipc, id, field_name)
+{
+  var payload = null;
+  if(ipc != null){
+    payload =
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
+  } else {
+    if(id != null){
+      if(field_name == "item_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "item_id" : id.toString()
+          };
+      }
+      if(field_name == "label_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
+      }
+      
+    } else {
+      payload =
+        {
+          "token" : token,
+          "sync_token": '*',
+          "resource_types" : resource_type
+        };
+    }
+  }
+  
+  return(payload);
+}
+function getPayloadUpdateV7(resource_type, type, token, items, commands)
+{
+  var payload = null;
+
+  payload =
+    {
+      "token" : token,
+      "sync_token" : '*',
+      "resource_types" : resource_type,
+      "commands" : commands
+    };
+  
+  return(payload);
+}
+function getCommands(items, type, max_count)
+{
+  var commands = [];
+  if(max_count == null || max_count == "") max_count = 100;
+  var count = 0;
+  for each(var item in items){
+    //var args = [];
+    var args = {
+      "id": item.id.toString(), 
+      "due_date_utc": getDatePost(item.due_date_utc)
+    };
+    //args.push(arg);
+    //
+    var common = {
+      "type":  type,
+      "temp_id": uuidv4(),
+      "uuid": uuidv4(),
+      "args": args
+    };
+    commands.push(common);
+    count++;
+    if(count >= max_count) break;
+  }
+  commands = JSON.stringify(commands);
+  
+  return (commands);
+}
+function getPayloadV8(resource_type, token, ipc, id, field_name)
+{
+  var payload = null;
+  if(ipc != null){
+    payload =
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
+  } else {
+    if(id != null){
+      if(field_name == "item_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "item_id" : id.toString()
+          };
+      }
+      if(field_name == "label_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
+      }
+      
+    } else {
+      payload =
+        {
+          "Authorization": "Bearer "+token
+        };
+    }
+  }
+  
+  return(payload);
+}
+
+function getResponseContent(apiURL, options, spreadsheetId, config)
+{
+  if(!checkUrlfetch(spreadsheetId, false, config)) return(null);
+  //
+  var response = UrlFetchApp.fetch(apiURL, options);
+  var response_content_text = response.getContentText();
+  var content = null;
+  if(response_content_text != null && response_content_text != "") {
+    try{
+      content = JSON.parse(response_content_text);
+    } catch (e){
+      content = null;
+    }
+  }
+  return(content);
+}
+function checkExistenceSheets(ss, sheet_name)
+{
+  if (ss.getSheetByName(sheet_name) == null){
+    ss.insertSheet(sheet_name);
+  }
+}
+function getProjectsFor(row_number, spreadsheetId)
+{
+  var tmp = getParamValue(row_number, spreadsheetId);
+  var arr = tmp.split(", ");
+  return (arr);
+}
+function insertItemArray(arr, item)
+{
+  arr.push(item);
+  
+  return (arr);
+}
+function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, config)
+{
+  var item_new = getEmptyItemForTask();
+  
+  if(completed_tasks){
+    if(is_refreshing){
+      item_new = getSingleItem(token, item.id, spreadsheetId, config);
+    } else {
+      item_new = getFillForCompleted(item_new, item);
+    }      
+  }
+  //
+  item_new.due_date_utc = getDate(item.due_date_utc);
+  item_new.date_added = getDate(item.date_added);
+  item_new.date_completed = getDate(item.date_completed);
+  
+  if(item_new.date_completed != null && item_new.date_completed != ""){
+    item_new.year_completed = item_new.date_completed.getFullYear();
+    item_new.year_completed = item_new.year_completed.toString();
+    item_new.month_completed = item_new.date_completed.getMonth() + 1;
+    item_new.month_completed = item_new.month_completed.toString();
+    item_new.day_completed = item_new.date_completed.getDate() + 1;
+    item_new.day_completed = item_new.day_completed.toString();
+    item_new.day_of_week_completed = item_new.date_completed.getDay();
+    if(item_new.day_of_week_completed == 0) item_new.day_of_week_completed = 7;
+    item_new.day_of_week_completed = item_new.day_of_week_completed.toString();
+    item_new.week_completed = getWeekNumber(item_new.date_completed);
+  }
+  if(item_new.due_date_utc != null && item_new.due_date_utc != ""){
+    item_new.year_due = item_new.due_date_utc.getFullYear();
+    item_new.year_due = item_new.year_due.toString();
+    item_new.month_due = item_new.due_date_utc.getMonth() + 1;
+    item_new.month_due = item_new.month_due.toString();
+    item_new.day_due = item_new.due_date_utc.getDate();
+    item_new.day_completed = item_new.due_date_utc.toString();
+    item_new.day_of_week_due = getWeekDay(item_new.due_date_utc);
+    item_new.week_due = getWeekNumber(item_new.due_date_utc);
+  }
+  if(item_new.date_added != null && item_new.date_added != ""){
+    item_new.year_added = item_new.date_added.getFullYear();
+    item_new.year_added = item_new.year_added.toString();
+    item_new.month_added = item_new.date_added.getMonth();
+    item_new.month_added = item_new.month_added.toString();
+    item_new.week_added = getWeekNumber(item_new.date_added);
+  }
+  item_new.now = new Date();
+  item_new.now_time = item_new.now.getTime();
+  //
+  item_new.project_id = item.project_id;
+  var project = getProject(data_p.projects, item_new.project_id);
+  item_new.user_name = getUserName(data_c.collaborators, item.responsible_uid, default_name);
+  if(default_name != "" && default_name != null){
+    if(item_new.user_name != default_name) return (null);
+  }
+  //
+  if(item.responsible_uid != null) item_new.responsible_uid = item.responsible_uid;
+  if(project!=null) item_new.project_name = project.name;
+  //
+  item_new.labels = getLabelNames(item.labels, data_l, "", token, spreadsheetId);
+  item_new.content = item.content;
+  item_new.all_day = item.all_day;
+  //
+  item_new.completed = item.checked;
+  item_new.is_deleted = item.is_deleted;
+  item_new.id = item.id.toString();
+  item_new.project_id = item_new.project_id.toString();
+  item_new.responsible_uid = item_new.responsible_uid.toString();
+  item_new.priority = item.priority;  
+  //
+  return (item_new);
+}
+function getEmptyItemForTask()
+{
+  var item = new Object();
+  item.checked = null;
+  item.is_deleted = null;
+  item.labels = null;
+  //
+  item.due_date_utc = null;
+  item.year_due = null;
+  item.month_due = null;
+  item.day_due = null;
+  item.day_of_week_due = null;
+  item.week_due = null;
+  //
+  item.date_added = null;
+  item.year_added = "";
+  item.month_added = "";
+  item.week_added = "";
+  //
+  item.date_completed = null;
+  item.year_completed = "";
+  item.month_completed = "";
+  item.day_completed = "";
+  item.day_of_week_completed = "";
+  item.week_completed = "";
+  //
+  item.project_id = null;
+  item.responsible_uid = null;
+  item.all_day = null;
+  item.content = null;
+  item.priority = 1;
+  item.id = null;
+  item.now = "";
+  item.now_item = "";
+  item.user_name = "";
+  item.project_name = "";
+  item.responsible_uid = 0;
+  item.labels = null;
+  item.checked = false;
+  item.is_deleted = 0;
+  item.content = "";
+  item.all_day = true;
+  item.id_modified = 0;
+  
+  return (item);
+}
+function checkAcceptProjectsId(arr, need_id)
+{
+  if(arr == null) return(false);
+  if(need_id == null) return(false);
+  for each(var row in arr) {
+    if(row == need_id)return(true);
+  }
+  return(false);
+}
+function getSingleItem(token, id, spreadsheetId, config)
+{
+  var apiURL = "https://todoist.com/api/v7/items/get";
+  var item = null;
+  var data = getResource(apiURL, token, 7, '["item"]', null, id, "item_id", spreadsheetId, config);
+  if(data != null) item = data.item;
+  return(item);
+}
+function getFillForCompleted(item, row)
+{
+  //item.responsible_uid = row.user_id;
+  item.user_id = row.user_id;
+  item.id = row.id;
+  item.project_id = row.project_id;
+  item.completed_date = row.completed_date;
+  
+  return (item);
+}
+function convertArrStringToNumber(arr)
+{
+  var count = arr.length;
+  for(var i = 0; i< count; i++){
+    arr[i] = getNumberString(arr[i]);
+  }
+  return (arr);
+}
+function getNumberString(str)
+{
+  var tmp = -1;
+  if(str == null || str == "") return (tmp);
+  tmp = Number(str);
+  return(tmp);
+}
+function getMaxDay(spreadsheetId, type)
+{
+  var tmp = 1;
+  type = type.toUpperCase();
+  if(type == "HOME") tmp = getParamValue(4, spreadsheetId);
+  if(type == "WORK") tmp = getParamValue(5, spreadsheetId);
+  tmp = getNumberString(tmp);
+  
+  return(tmp);
+}
+function getUserName(arr, need_id, default_name)
+{
+  var name = default_name;
+  if(arr == null) return(name);
+  if(need_id == 0 || need_id == null) return(name);
+
+  for each(var row in arr){
+    if(row.id == need_id) {
+      name = row.full_name;
+      break;
+    }
+  }
+
+  return(name);
+}
+function getLabelNames(arr, labels, default_name, token, spreadsheetId)
+{
+  var name = default_name;
+  
+  if(arr == null) {
+    arr = new Array();
+    arr.push([""]);
+    return(arr);
+  }
+  var count = arr.length;
+  
+  for (var i = 0; i < count; i++){
+    arr[i] = getLabelName(arr[i].toString(), labels, "", token, spreadsheetId);
+  }
+
+  return(arr);
+}
+function getLabelName(need_id, labels, default_name, token, spreadsheetId)
+{
+  var name = default_name;
+
+  if(need_id == 0 || need_id == null || need_id == "" || labels == null) return(name);
+  for each(var row in labels.labels){
+    if(row.id == need_id) return (row.name);
+  }
+}
+function getWeekDay(date)
+{
+  var day = date.getDay();
+  if(day == 0) day = 7;
+  return (Number(day));
+}
+function setParamConfig(param_name, value, row_number, spreadsheetId, column_number)
+{
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName("config");
+  //
+  sheet.getRange(row_number, 1, 1, 1).setValue(param_name);
+  sheet.getRange(row_number, 2, 1, 1).setValue(value);
+}
+function getParamValue(row_number, spreadsheetId, column_number)
+{
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName("config");
+  var value = null;
+  if(column_number == null || column_number < 1){
+    value = sheet.getRange(row_number, 2, 1, 1).getValues()[0][0];
+  } else {
+    value = sheet.getRange(row_number, column_number, 1, 1).getValues()[0][0];
+  }
+  if(value == null || value == "") value = -1;
+  return(value);
+}
+
+function getAcceptProjects(need_projects_name, data_p)
+{
+  var arr = [];
+  for each(var need_project_name in need_projects_name){
+    for each(var project in data_p.projects){
+      if(project.is_deleted == 1) continue;
+      if(arr.length > 0){
+        if(project.name.toUpperCase() == need_project_name.toUpperCase()){
+          arr.push(project.id);
+        } else {
+          if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
+          if(checkAcceptProjectsId(arr, project.id)) continue;
+          arr.push(project.id);
+        }
+      } else {
+        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
+        arr.push(project.id);
+      }
+    }
+  }
+  return (arr);
+}
+function getDate(value)
+{
+  var moment = Moment.moment(value);
+    var new_value = "";
+    if(moment != null && value != null)
+    {
+      new_value = moment.toDate();
+    }
+  return(new_value);
+}
+function getWeekNumber(value)
+{
+  if(value == null || value == "") return (null);
+  value = getNumberString(Utilities.formatDate(value, "GMT", "w"));
+  return (value);
+}
+function getDatePost(value)
+{
+  if(value == null || value == "") return (null);
+  value = Utilities.formatDate(value, "GMT", 'yyyy-MM-dd\'T\'HH:mm').toString();
+  return (value);
+}
+function getProject(arr, need_id)
+{
+  var obj = null;
+  if(arr == null) return(obj);
+
+  for each(var row in arr){
+    if(row.id == need_id) {
+      obj = row;
+      break;
+    }
+  }
+
+  return(obj);
+}
+function checkUrlfetch(spreadsheetId, is_start, config)
+{
+  var tmp_var5 = getParamValue(config[0][0], spreadsheetId, config[0][1]);
+  tmp_var5 = Number(tmp_var5);
+  if(tmp_var5 < 0) tmp_var5 = 0;
+  var tmp_var6 = getParamValue(config[1][0], spreadsheetId, config[1][1]);
+  tmp_var6 = Number(tmp_var6);
+  //urlfetch
+  var percent = tmp_var5 /  tmp_var6 * 100;
+  //
+  var now = new Date();
+  var now_day = now.getDay();
+  var urlfetch_date = getDate(getParamValue(19, spreadsheetId));
+  var urlfetch_date_day = urlfetch_date.getDay();
+  //
+  if(percent > 90 && now_day == urlfetch_date_day) return(false);
+  if(is_start) return(true);
+  setParamConfig("urlfetch", tmp_var5 + 1, config[0][0], spreadsheetId);
+  setParamConfig("urlfetch_date", now, config[2][0], spreadsheetId);
+  return(true);
+}
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+function getDateNextWeek(date)
+{
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  
+  var now_day = getWeekDay(date);
+  var div = 8 - now_day;
+  date = getDate(date);
+  //
+  var next_week = new Date(date.getTime() + div * MILLIS_PER_DAY);
+  return (next_week);
+  
+}
+function createDayOfWeek(day, day_max, p, date)
+{
+  var obj = new Object();
+  
+  obj.day = Number(day);
+  obj.day_max = day_max;
+  obj.day_count = 0;
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  var week_date = getWeekDay(date);
+  if(day < week_date){
+    obj.date = new Date(date.getTime() - (week_date - day) * MILLIS_PER_DAY);
+  } else {
+    obj.date = new Date(date.getTime() + (day - week_date) * MILLIS_PER_DAY);
+  }
+  obj.date = getDate(obj.date);
+  if(p != null){
+    obj.count_p1 = 0;
+    obj.max_p1 = p[0];
+    obj.count_p2 = 0;
+    obj.max_p2 = p[1];
+    obj.count_p3 = 0;
+    obj.max_p3 = p[2];
+    obj.count_p4 = 0;
+    obj.max_p4 = p[3];
+  } else {
+    obj.count_p1 = 0;
+    obj.max_p1 = 0;
+    obj.count_p2 = 0;
+    obj.max_p2 = 0;
+    obj.count_p3 = 0;
+    obj.max_p3 = 0;
+    obj.count_p4 = 0;
+    obj.max_p4 = 0;
+  }
+  obj.items = [];
+  return (obj);
+}
+
+
+function createEmptyWeek(day_max, p, date)
+{
+  var arr_obj = [];
+  
+  for(var i=0;i<7;i++){
+    var obj = createDayOfWeek(i+1, day_max, p, date);
+    arr_obj.push(obj);
+  }
+  
+  return (arr_obj);
+}
+function updateTasks(resource_type, type, token, items, spreadsheetId, config)
+{
+  var apiURL = "https://todoist.com/api/v7/sync";
+  var commands = getCommands(items, type, 100);
+  var payload = getPayloadUpdateV7(resource_type, type, token, items, commands);
+  var options = getOptions(payload, "post");
+  var content = getResponseContent(apiURL, options, spreadsheetId, config);
+
+  return(content);
+}
+function getSingleLabel(token, id, spreadsheetId)
+{
+  var apiURL = "https://todoist.com/api/v7/labels/get";
+  var item = null;
+  var data = getResource(apiURL, token, 7, '["label"]', null, id, "label_id", spreadsheetId);
+  if(data != null) item = data.label;
+  return(item);
+}
+function getMaxCountRows(sheet)
+{
+  var count = 0;
+  var sheet_data = sheet.getDataRange().getValues();
+  for(var i = sheet_data.length-1 ; i >=0 ; i--){
+    if (sheet_data[i][0] != null && sheet_data[i][0] != ''){
+      count=i+1;
+      break;
+    }
+  }
+  
+  return(count);
+}
+function insertItemArrayIndexes(item)
+{
+  var arr = [];
+  arr.push(
+    item.date_added,
+    item.due_date_utc,
+    item.date_completed,
+    item.year_completed,
+    item.month_completed,
+    item.day_completed,
+    item.day_of_week_completed,
+    item.all_day, 
+    item.content,
+    item.priority,
+    item.responsible_uid,
+    item.user_name, 
+    item.completed,
+    item.project_id,
+    item.project_name,
+    "",
+    item.id,
+    item.now,
+    "",
+    item.now,
+    item.now_time,
+    item.year_added,
+    item.month_added,
+    item.year_due,
+    item.month_due,
+    1,
+    item.labels
+  );
+  
+  return (arr);
+}
