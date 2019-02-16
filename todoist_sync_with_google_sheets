@@ -1,27 +1,29 @@
 function myFunction() {
-  var need_projects_name = ["name1", "name2", "Team Inbox"];
   var spreadsheetId = "<sheet id>";
-  var default_name = "<default name>";
-  var token = '<token>';
+  //
+  var need_projects_name = kts.getProjectsFor(10, spreadsheetId);
+  var default_name = kts.getProjectsFor(11, spreadsheetId).toString();
+  var token = kts.getProjectsFor(9, spreadsheetId).toString();
   var api_URL = "https://todoist.com/API/v7/sync";
   var api_URL_completed_get_all = "https://todoist.com/api/v7/completed/get_all";
   var api_URL_V8 = "https://beta.todoist.com/API/v8/";
+  var conifig_param_url_fetch = [[6, 2],[7, 2], [8, 2]];
   initializeSheets(spreadsheetId);
-  if(!checkUrlfetch(spreadsheetId, true)) return;
-  var data_c = getResource(api_URL, token, 7, '["collaborators"]', null, null, null, spreadsheetId);
-  var data_p = getResource(api_URL, token, 7, '["projects"]', null, null, null, spreadsheetId);
-  var data_l = getResource(api_URL, token, 7, '["labels"]', null, null, null, spreadsheetId);
-  var data = getResource(api_URL, token, 7, '["items"]', null, null, null, spreadsheetId);
+  if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
+  var data_c = kts.getResource(api_URL, token, 7, '["collaborators"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
+  var data_p = kts.getResource(api_URL, token, 7, '["projects"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
+  var data_l = kts.getResource(api_URL, token, 7, '["labels"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
+  var data = kts.getResource(api_URL, token, 7, '["items"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
 
   var count_c = 100;
-  count_c = getParamValue(2, spreadsheetId);
+  count_c = kts.getParamValue(3, spreadsheetId);
   var ipc_start = 0;
   //
-  var tmp_var = getParamValue(1, spreadsheetId);
+  var tmp_var = kts.getParamValue(2, spreadsheetId);
   if(tmp_var > 0 && tmp_var < count_c) ipc_start = tmp_var;
   //
-  var tmp_var3 = getParamValue(3, spreadsheetId);
-  var tmp_var4 = getParamValue(4, spreadsheetId);
+  var tmp_var3 = kts.getParamValue(4, spreadsheetId);
+  var tmp_var4 = kts.getParamValue(5, spreadsheetId);
   //
   //
   var need_refresh_tasks = false;
@@ -34,411 +36,45 @@ function myFunction() {
   }
   //
   if(need_refresh_tasks ) {
-    grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, false, default_name, "Work", true);
-    setParamConfig("refreshed", Math.floor(tmp_var / tmp_var4), 3, spreadsheetId);
+    grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, false, default_name, "Work", true, conifig_param_url_fetch);
+    kts.setParamConfig("refreshed", Math.floor(tmp_var / tmp_var4), 4, spreadsheetId);
   }
   //
   for(var ipc = ipc_start; ipc < count_c;  ipc++){
-    var data_completed_tasks = getResource(api_URL_completed_get_all, token, 7, '["items"]', ipc, null, null, spreadsheetId);
-    setParamConfig("completed_tasks_ipc", ipc, 1, spreadsheetId);
+    var data_completed_tasks = kts.getResource(api_URL_completed_get_all, token, 7, '["items"]', ipc, null, null, spreadsheetId, conifig_param_url_fetch);
+    kts.setParamConfig("completed_tasks_ipc", ipc, 2, spreadsheetId);
     if(data_completed_tasks==null) break;
-    grabTasks(data_completed_tasks, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, true, default_name, "Work", false);
+    grabTasks(data_completed_tasks, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, true, default_name, "Work", false, conifig_param_url_fetch);
   }
 }
 function initializeSheets(spreadsheetId)
 {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  checkExistenceSheets(ss, "config");
-  checkExistenceSheets(ss, "Work");
+  kts.checkExistenceSheets(ss, "config");
+  kts.checkExistenceSheets(ss, "Work");
 }
-function checkExistenceSheets(ss, sheet_name)
-{
-  if (ss.getSheetByName(sheet_name) == null){
-    ss.insertSheet(sheet_name);
-  }
-}
-function setParamConfig(param_name, value, column_number, spreadsheetId)
-{
-  var ss = SpreadsheetApp.openById(spreadsheetId);
-  var sheet = ss.getSheetByName("config");
-  //
-  sheet.getRange(1, column_number, 1, 1).setValue(param_name);
-  sheet.getRange(2, column_number, 1, 1).setValue(value);
-}
-function getParamValue(column_number, spreadsheetId)
-{
-  var ss = SpreadsheetApp.openById(spreadsheetId);
-  var sheet = ss.getSheetByName("config");
-  var value = null;
-  value = sheet.getRange(2, column_number, 1, 1).getValues()[0][0];
-  if(value == null || value == "") value = -1;
-  return(value);
-}
-function getResource(apiURL, token, api_version, resource_type, ipc, id, field_name, spreadsheetId){
-  var payload = null;
-  if(api_version == 7){
-    payload = getPayloadV7(resource_type, token, ipc, id, field_name);
-  }
-  if(api_version == 8){
-    payload = getPayloadV8(resource_type, token, ipc, id, field_name);
-  }
-  if(api_version == 8){
-    apiURL = apiURL+resource_type;
-  }
-   var options = getOptions(payload);
-   var content = getResponseContent(apiURL, options, spreadsheetId);
-
-  return(content);
-}
-function getOptions(payload)
-{
-  var options =
-      {
-        method : "get",
-        payload : payload,
-        contentType: 'application/x-www-form-urlencoded',
-        muteHttpExceptions : true
-      };
-  
-  return(options);
-}
-function getPayloadV7(resource_type, token, ipc, id, field_name)
-{
-  var payload = null;
-  if(ipc != null){
-    payload =
-      {
-        "token" : token,
-        "sync_token": '*',
-        "resource_types" : resource_type,
-        "offset" : ipc.toString()
-        
-      };
-  } else {
-    if(id != null){
-      if(field_name == "item_id")
-      {
-        payload =
-          {
-            "token" : token,
-            "item_id" : id.toString()
-          };
-      }
-      if(field_name == "label_id")
-      {
-        payload =
-          {
-            "token" : token,
-            "label_id" : id.toString()
-          };
-      }
-      
-    } else {
-      payload =
-        {
-          "token" : token,
-          "sync_token": '*',
-          "resource_types" : resource_type
-        };
-    }
-  }
-  
-  return(payload);
-}
-function getPayloadV8(resource_type, token, ipc, id, field_name)
-{
-  var payload = null;
-  if(ipc != null){
-    payload =
-      {
-        "token" : token,
-        "sync_token": '*',
-        "resource_types" : resource_type,
-        "offset" : ipc.toString()
-        
-      };
-  } else {
-    if(id != null){
-      if(field_name == "item_id")
-      {
-        payload =
-          {
-            "token" : token,
-            "item_id" : id.toString()
-          };
-      }
-      if(field_name == "label_id")
-      {
-        payload =
-          {
-            "token" : token,
-            "label_id" : id.toString()
-          };
-      }
-      
-    } else {
-      payload =
-        {
-          "Authorization": "Bearer "+token
-        };
-    }
-  }
-  
-  return(payload);
-}
-
-function getResponseContent(apiURL, options, spreadsheetId)
-{
-  if(!checkUrlfetch(spreadsheetId, false)) return(null);
-  //
-  var response = UrlFetchApp.fetch(apiURL, options);
-  var response_content_text = response.getContentText();
-  var content = null;
-  if(response_content_text != null && response_content_text != "") {
-    try{
-      content = JSON.parse(response_content_text);
-    } catch (e){
-      content = null;
-    }
-  }
-  return(content);
-}
-function checkUrlfetch(spreadsheetId, is_start)
-{
-  var tmp_var5 = getParamValue(5, spreadsheetId);
-  tmp_var5 = Number(tmp_var5);
-  if(tmp_var5 < 0) tmp_var5 = 0;
-  var tmp_var6 = getParamValue(6, spreadsheetId);
-  tmp_var6 = Number(tmp_var6);
-  //urlfetch
-  var percent = tmp_var5 /  tmp_var6 * 100;
-  //
-  var now = new Date();
-  var now_day = now.getDay();
-  var urlfetch_date = getDate(getParamValue(7, spreadsheetId));
-  var urlfetch_date_day = urlfetch_date.getDay();
-  //
-  if(percent > 90 && now_day == urlfetch_date_day) return(false);
-  if(is_start) return(true);
-  setParamConfig("urlfetch", tmp_var5 + 1, 5, spreadsheetId);
-  setParamConfig("urlfetch_date", now, 7, spreadsheetId);
-  return(true);
-}
-
-function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshing) {
+function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshing, conifig_param_url_fetch) {
   if(data == null || data_c == null || data_p == null) return;
   var all_tasks = [];
   var filtered_tasks = [];
-  var accept_project_entries = getAcceptProjects(need_projects_name, data_p);
+  var accept_project_entries = kts.getAcceptProjects(need_projects_name, data_p);
   
   for each(var row in data.items) {
-    var item = getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name);
+    var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, conifig_param_url_fetch);
     if(item == null) continue;
     if (item.is_deleted == 1) continue;
-    all_tasks = insertItemArray(all_tasks, item);           
-    var is_good = checkAcceptProjectsId(accept_project_entries, item.project_id);
+    all_tasks = kts.insertItemArray(all_tasks, item);           
+    var is_good = kts.checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
-    filtered_tasks = insertItemArray(filtered_tasks, item);  
+    filtered_tasks = kts.insertItemArray(filtered_tasks, item);  
   }
   //
   var ss = SpreadsheetApp.openById(spreadsheetId);
   var idRowStart = 2; 
   Logger.log("allTasks: " + all_tasks.length);
   Logger.log("allTasks: " + filtered_tasks.length);
-  processTasks(sheet_name, ss, filtered_tasks, false, true, spreadsheetId, token);
+  processTasks(sheet_name, ss, filtered_tasks, false, true, spreadsheetId, token, conifig_param_url_fetch);
   
-}
-function getAcceptProjects(need_projects_name, data_p)
-{
-  var arr = [];
-  for each(var need_project_name in need_projects_name){
-    for each(var project in data_p.projects){
-      if(project.is_deleted == 1) continue;
-      if(arr.length > 0){
-        if(project.name.toUpperCase() == need_project_name.toUpperCase()){
-          arr.push(project.id);
-        } else {
-          if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
-          if(checkAcceptProjectsId(arr, project.id)) continue;
-          arr.push(project.id);
-        }
-      } else {
-        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
-        arr.push(project.id);
-      }
-    }
-  }
-  return (arr);
-}
-function insertItemArray(arr, item)
-{
-  arr.push([
-    item.date_added,
-    item.due_date_utc,
-    item.date_completed,
-    item.year_completed,
-    item.month_completed,
-    item.day_completed,
-    item.day_of_week_completed,
-    item.all_day, 
-    item.content,
-    item.priority,
-    item.responsible_uid,
-    item.user_name, 
-    item.completed,
-    item.project_id,
-    item.project_name,
-    "",
-    item.id,
-    item.now,
-    "",
-    item.now,
-    item.now_time,
-    item.year_added,
-    item.month_added,
-    item.year_due,
-    item.month_due,
-    1,
-    item.labels
-  ]);
-  
-  return (arr);
-}
-function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name)
-{
-  var item_new = getEmptyItemForTask();
-  
-  if(completed_tasks){
-    if(is_refreshing){
-      item_new = getSingleItem(token, item.id, spreadsheetId);
-    } else {
-      item_new = getFillForCompleted(item_new, item);
-    }      
-  }
-  //
-  item_new.due_date_utc = getDate(item.due_date_utc);
-  item_new.date_added = getDate(item.date_added);
-  item_new.date_completed = getDate(item.date_completed);
-  
-  if(item_new.date_completed != null && item_new.date_completed != ""){
-    item_new.year_completed = item_new.date_completed.getFullYear();
-    item_new.year_completed = item_new.year_completed.toString();
-    item_new.month_completed = item_new.date_completed.getMonth() + 1;
-    item_new.month_completed = item_new.month_completed.toString();
-    item_new.day_completed = item_new.date_completed.getDate() + 1;
-    item_new.day_completed = item_new.day_completed.toString();
-    item_new.day_of_week_completed = item_new.date_completed.getDay() + 1;
-    if(item_new.day_of_week_completed == 0) item_new.day_of_week_completed = 7;
-    item_new.day_of_week_completed = item_new.day_of_week_completed.toString();
-  }
-  if(item_new.due_date_utc != null && item_new.due_date_utc != ""){
-    item_new.year_due = item_new.due_date_utc.getFullYear();
-    item_new.year_due = item_new.year_due.toString();
-    item_new.month_due = item_new.due_date_utc.getMonth() + 1;
-    item_new.month_due = item_new.month_due.toString();
-  }
-  if(item_new.date_added != null && item_new.date_added != ""){
-    item_new.year_added = item_new.date_added.getFullYear();
-    item_new.year_added = item_new.year_added.toString();
-    item_new.month_added = item_new.date_added.getMonth() + 1;
-    item_new.month_added = item_new.month_added.toString();
-  }
-  item_new.now = new Date();
-  item_new.now_time = item_new.now.getTime();
-  //
-  item_new.project_id = item.project_id;
-  var project = getProject(data_p.projects, item_new.project_id);
-  item_new.user_name = getUserName(data_c.collaborators, item.responsible_uid, default_name);
-  //
-  if(item.responsible_uid != null) item_new.responsible_uid = item.responsible_uid;
-  if(project!=null) item_new.project_name = project.name;
-  //
-  item_new.labels = getLabelNames(item.labels, data_l, "", token, spreadsheetId);
-  item_new.content = item.content;
-  item_new.all_day = item.all_day;
-  //
-  item_new.completed = item.checked;
-  item_new.is_deleted = item.is_deleted;
-  item_new.id = item.id.toString();
-  item_new.project_id = item_new.project_id.toString();
-  item_new.responsible_uid = item_new.responsible_uid.toString();
-  item_new.priority = item.priority; 
-  //
-  return (item_new);
-}
-function getEmptyItemForTask()
-{
-  var item = new Object();
-  item.checked = null;
-  item.is_deleted = null;
-  item.labels = null;
-  item.due_date_utc = null;
-  item.date_added = null;
-  item.date_completed = null;
-  item.project_id = null;
-  item.responsible_uid = null;
-  item.all_day = null;
-  item.content = null;
-  item.priority = null;
-  item.id = null;
-  item.due_date_utc = "";
-  item.year_due = "";
-  item.date_added = "";
-  item.year_added = "";
-  item.month_added = "";
-  item.date_completed = "";
-  item.year_completed = "";
-  item.month_completed = "";
-  item.day_completed = "";
-  item.day_of_week_completed = "";
-  item.now = "";
-  item.now_item = "";
-  item.user_name = "";
-  item.project_name = "";
-  item.responsible_uid = 0;
-  item.labels = null;
-  item.checked = false;
-  item.is_deleted = 0;
-  item.content = "";
-  item.all_day = true;
-  
-  return (item);
-}
-function getFillForCompleted(item, row)
-{
-  //item.responsible_uid = row.user_id;
-  item.user_id = row.user_id;
-  item.id = row.id;
-  item.project_id = row.project_id;
-  item.completed_date = row.completed_date;
-  
-  return (item);
-}
-function getDate(value)
-{
-  var moment = Moment.moment(value);
-    var new_value = "";
-    if(moment != null && value != null)
-    {
-      new_value = moment.toDate();
-    }
-  return(new_value);
-}
-function getSingleItem(token, id, spreadsheetId)
-{
-  var apiURL = "https://todoist.com/api/v7/items/get";
-  var item = null;
-  var data = getResource(apiURL, token, 7, '["item"]', null, id, "item_id", spreadsheetId);
-  if(data != null) item = data.item;
-  return(item);
-}
-function getSingleLabel(token, id, spreadsheetId)
-{
-  var apiURL = "https://todoist.com/api/v7/labels/get";
-  var item = null;
-  var data = getResource(apiURL, token, 7, '["label"]', null, id, "label_id", spreadsheetId);
-  if(data != null) item = data.label;
-  return(item);
 }
 function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadsheetId, token)
 {
@@ -449,13 +85,13 @@ function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadshee
 }
 function fillSheet(arr, sheet, check_exists, spreadsheetId, token)
 {
-  var maxRows = getMaxCountRows(sheet);
+  var maxRows = kts.getMaxCountRows(sheet);
   var sheet_values = sheet.getDataRange().getValues();
   for (i = 0; i < arr.length; i++)
   {
     var index = i;
-    maxRows = getMaxCountRows(sheet);
-    var row_number = checkItimeId(arr[index][16], sheet_values, maxRows, check_exists);
+    maxRows = kts.getMaxCountRows(sheet);
+    var row_number = checkItimeId(arr[index].id, sheet_values, maxRows, check_exists);
     if(row_number >= 0){
       sheet_values = modifyItem(arr[index], sheet, row_number, spreadsheetId, token, sheet_values);
     } 
@@ -471,8 +107,8 @@ function fillSheet(arr, sheet, check_exists, spreadsheetId, token)
   for (i = 0; i < arr.length; i++)
   {
     var index = i;
-    maxRows = getMaxCountRows(sheet);
-    var row_number = checkItimeId(arr[index][16], sheet_values, maxRows, check_exists);
+    maxRows = kts.getMaxCountRows(sheet);
+    var row_number = checkItimeId(arr[index].id, sheet_values, maxRows, check_exists);
     if(row_number >= 0){
       //modifyItem(arr[index], sheet, row_number, spreadsheetId, token, sheet_values);
     } else {
@@ -548,7 +184,7 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
   
   //var is_completed = sheet.getRange(row_number, 13, 1, 1).getValues()[0][0];
   var is_completed = sheet_values[row_number][12];
-  var item_is_completed = item[12];
+  var item_is_completed = item.completed;
   if(is_completed != item_is_completed) 
   {
     id_modified = 1;
@@ -556,7 +192,7 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
   //
   //var name = sheet.getRange(row_number, 9, 1, 1).getValues()[0][0];
   var name = sheet_values[row_number][8];
-  var item_name = item[8];
+  var item_name = item.content;
   if(name != item_name) 
   {
     id_modified = 2;
@@ -564,7 +200,7 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
   //
   //var responsible_uid = sheet.getRange(row_number, 11, 1, 1).getValues()[0][0];
   var responsible_uid = sheet_values[row_number][10];
-  var item_responsible_uid = item[10];
+  var item_responsible_uid = item.responsible_uid;
   if(responsible_uid != item_responsible_uid && item_responsible_uid != null) 
   {
     id_modified = 3;
@@ -572,31 +208,32 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
   //
   //var priority = sheet.getRange(row_number, 10, 1, 1).getValues()[0][0];
   var priority = sheet_values[row_number][9];
-  var item_priority = item[9];
+  var item_priority = item.priority;
   if(priority != item_priority) 
   {
     id_modified = 4;
   }
   //var day_completed = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
   var day_completed = sheet_values[row_number][5];
-  var item_day_completed = item[5];
+  var item_day_completed = item.day_completed;
   if(day_completed != item_day_completed) 
   {
     id_modified = 5;
   }
+  var arr = kts.insertItemArrayIndexes(item);
   if(id_modified > 0){
     for(var j = 0; j < 26; j++){
-      if(item[j] == "" || item[j] == null) continue;
-      sheet_values[row_number][j] = item[j];
+      if(arr[j] == "" || arr[j] == null) continue;
+      sheet_values[row_number][j] = arr[j];
     }
   }
   //var label = sheet.getRange(row_number, 27, 1, 1).getValues()[0][0];
   var label = sheet_values[row_number][26];
-  var item_label = item[26][0];
+  var item_label = item.labels[0];
   if(label != item_label) 
   {
     id_modified = 7;
-    var labels = item[26];
+    var labels = item.labels;
     var index_col_start = 26;
     if(labels != null){
       var count_l = labels.length;
@@ -609,10 +246,10 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
     }
   }
   //
-  item[18] = id_modified.toString();
+  item.id_modified = id_modified.toString();
   
   if(id_modified > 0) {
-    sheet_values[row_number][18] = item[18];
+    sheet_values[row_number][18] = item.id_modified;
     //addModifyItem(item, sheet, row_number, sheet_values);
   }
   return (sheet_values);
@@ -629,58 +266,13 @@ function addModifyItem(item, sheet, row_number, id_modified, sheet_values)
 }
 function addNewItem(item, sheet, row_number, id_modified)
 {
-  //create date
-  sheet.getRange(row_number, 1, 1, 1).setValue(item[0]);
-    //date due to
-  sheet.getRange(row_number, 2, 1, 1).setValue(item[1]);
-   //completed date
-  sheet.getRange(row_number, 3, 1, 1).setValue(item[2]);
-  //year completed
-  sheet.getRange(row_number, 4, 1, 1).setValue(item[3]);
-  //month completed
-  sheet.getRange(row_number, 5, 1, 1).setValue(item[4]);
-  //day completed
-  sheet.getRange(row_number, 6, 1, 1).setValue(item[5]);
-  //day of week completed
-  sheet.getRange(row_number, 7, 1, 1).setValue(item[6]);
-   //all day
-  sheet.getRange(row_number, 8, 1, 1).setValue(item[7]);
-    //subject
-  sheet.getRange(row_number, 9, 1, 1).setValue(item[8]);
-    //priority
-  sheet.getRange(row_number, 10, 1, 1).setValue(item[9]);
-    //responsible_uid
-  sheet.getRange(row_number, 11, 1, 1).setValue(item[10]);
-    //user_name
-  sheet.getRange(row_number, 12, 1, 1).setValue(item[11]);
-    //completed
-  sheet.getRange(row_number, 13, 1, 1).setValue(item[12]);
-    //project id
-  sheet.getRange(row_number, 14, 1, 1).setValue(item[13]);
-    //project
-  sheet.getRange(row_number, 15, 1, 1).setValue(item[14]);
-    //project parent id
-  sheet.getRange(row_number, 16, 1, 1).setValue(item[15]);
-    //item id
-  sheet.getRange(row_number, 17, 1, 1).setValue(item[16]);
-   //date changes
-  sheet.getRange(row_number, 18, 1, 1).setValue(item[17]);
-  //status changes
-  sheet.getRange(row_number, 19, 1, 1).setValue(item[18]);
-  //date checks
-  sheet.getRange(row_number, 20, 1, 1).setValue(item[19]);
-  //time checks
-  sheet.getRange(row_number, 21, 1, 1).setValue(item[20]);
-  //year creation
-  sheet.getRange(row_number, 22, 1, 1).setValue(item[21]);
-  //month creation
-  sheet.getRange(row_number, 23, 1, 1).setValue(item[22]);
-  //year due to
-  sheet.getRange(row_number, 24, 1, 1).setValue(item[23]);
-  //month due to
-  sheet.getRange(row_number, 25, 1, 1).setValue(item[24]);
-  //Count
-  sheet.getRange(row_number, 26, 1, 1).setValue(item[25]);
+  var arr = kts.insertItemArrayIndexes(item);
+  if(id_modified > 0){
+    for(var j = 0; j < 26; j++){
+      if(arr[j] == "" || arr[j] == null) continue;
+      sheet.getRange(row_number, j+1, 1, 1).setValue(arr[j]);
+    }
+  }
   //labels
   var labels = item[26];
   var index_col_start = 27;
@@ -712,82 +304,4 @@ function checkItimeId(item_id, sheet_values, count, check_exists)
     }
   }
   return (index);
-}
-function getUserName(arr, need_id, default_name)
-{
-  var name = default_name;
-  if(arr == null) return(name);
-  if(need_id == 0 || need_id == null) return(name);
-
-  for each(var row in arr){
-    if(row.id == need_id) {
-      name = row.full_name;
-      break;
-    }
-  }
-
-  return(name);
-}
-function getLabelNames(arr, labels, default_name, token, spreadsheetId)
-{
-  var name = default_name;
-  
-  if(arr == null) {
-    arr = new Array();
-    arr.push([""]);
-    return(arr);
-  }
-  var count = arr.length;
-  
-  for (var i = 0; i < count; i++){
-    arr[i] = getLabelName(arr[i].toString(), labels, "", token, spreadsheetId);
-  }
-
-  return(arr);
-}
-function getLabelName(need_id, labels, default_name, token, spreadsheetId)
-{
-  var name = default_name;
-
-  if(need_id == 0 || need_id == null || need_id == "" || labels == null) return(name);
-  for each(var row in labels.labels){
-    if(row.id == need_id) return (row.name);
-  }
-}
-function getProject(arr, need_id)
-{
-  var obj = null;
-  if(arr == null) return(obj);
-
-  for each(var row in arr){
-    if(row.id == need_id) {
-      obj = row;
-      break;
-    }
-  }
-
-  return(obj);
-}
-function checkAcceptProjectsId(arr, need_id)
-{
-  if(arr == null) return(false);
-  if(need_id == null) return(false);
-  for each(var row in arr) {
-    if(row == need_id)return(true);
-  }
-  return(false);
-}
-
-function getMaxCountRows(sheet)
-{
-  var count = 0;
-  var sheet_data = sheet.getDataRange().getValues();
-  for(var i = sheet_data.length-1 ; i >=0 ; i--){
-    if (sheet_data[i][0] != null && sheet_data[i][0] != ''){
-      count=i+1;
-      break;
-    }
-  }
-  
-  return(count);
 }
