@@ -639,3 +639,79 @@ function insertItemArrayIndexes(item)
   
   return (arr);
 }
+function maxMinByName(arr, name)
+{
+  var value = [arr[0][name], 0, arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] > value[0]) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+    if(item[name] < value[2]) {
+      value[2] = item[name];
+      value[3] = i;
+    }
+  }
+  return(value);
+}
+function maxByName(arr, name)
+{
+  var value = [arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] > value) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+  }
+  return(value);
+}
+function minByName(arr, name)
+{
+  var value = [arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] < value) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+  }
+  return(value);
+}
+function arrSortAscItemsByName(arr, name, type)
+{
+  var max_min_date =  maxMinByName(arr, name);
+  var max_date =  max_min_date[0];
+  var max_date_index =  max_min_date[1];
+  var min_date = max_min_date[2];
+  var min_date_index =  max_min_date[3];
+  //
+  if(type == null || type == "") type = "date";
+  var tmp_arr = [];
+  for (var i = 0; i < arr.length; i++){
+    tmp_arr.push(arr[i]);
+    for(var j = 0; j < tmp_arr.length; j++){
+      if(tmp_arr.length > 1){
+        var new_item = tmp_arr[tmp_arr.length - 1];
+        if(type == "date"){
+          if(new_item[name].getTime() < tmp_arr[j][name].getTime()){
+            var tmp_var = tmp_arr[j];
+            tmp_arr[j] = new_item;
+            tmp_arr[tmp_arr.length - 1] = tmp_var;
+          }
+        } else {
+          if(new_item[name] < tmp_arr[j][name]){
+            var tmp_var = tmp_arr[j];
+            tmp_arr[j] = new_item;
+            tmp_arr[tmp_arr.length - 1] = tmp_var;
+          }
+        }
+      }
+    }
+  }
+  var obj = new Object();
+  obj.arr = tmp_arr;
+  obj.max_min_date = max_min_date;
+  return (obj);
+}
