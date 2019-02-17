@@ -70,6 +70,9 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
   var date_next_week = kts.getDate(kts.getDateNextWeek(now));
   var count_previous_days = kts.getNumberString(kts.getParamValue(9, spreadsheetId, 2));
   //
+  var obj_arr = kts.arrSortAscItemsByName(arr, "date_added", "date");
+  var max_min_date = obj_arr.max_min_date;
+  arr = obj_arr.arr;
   for each(var item in arr){
     if(item.week_due > now_week) continue;
     var index = item.day_of_week_due-1;
@@ -83,7 +86,6 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
   }
   //
   for(var i = 0; i < arr_days.length; i++){
-    
       for(var j = arr_days[i].items.length - 1; j >= 0; j--){
         var need_change = false;
         if(arr_days[i].day < now_day - count_previous_days){
