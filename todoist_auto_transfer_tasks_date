@@ -11,27 +11,24 @@ function myFunction() {
   initializeSheets(spreadsheetId);
   var conifig_param_url_fetch = [[17, 2],[18, 2], [19, 2]];
   if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
-  var data_c = kts.getResource(api_URL, token, 7, '["collaborators"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-  var data_p = kts.getResource(api_URL, token, 7, '["projects"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-  var data_l = kts.getResource(api_URL, token, 7, '["labels"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-  var data = kts.getResource(api_URL, token, 7, '["items"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
+  var obj_data = kts.getData(token, 7, spreadsheetId, conifig_param_url_fetch);
   //
-  grabTasks(data, data_c, data_p, data_l, need_projects_name_for_home, spreadsheetId, token, false, default_name, "home", true, conifig_param_url_fetch);
+  grabTasks(obj_data, need_projects_name_for_home, spreadsheetId, token, false, default_name, "home", false, conifig_param_url_fetch);
   //
-  grabTasks(data, data_c, data_p, data_l, need_projects_name_for_work, spreadsheetId, token, false, default_name, "work", true, conifig_param_url_fetch);
+  grabTasks(obj_data, need_projects_name_for_work, spreadsheetId, token, false, default_name, "work", false, conifig_param_url_fetch);
 }
 function initializeSheets(spreadsheetId)
 {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   kts.checkExistenceSheets(ss, "config");
 }
-function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, completed_tasks, default_name, type, is_refreshing, conifig_param_url_fetch) {
-  if(data == null || data_c == null || data_p == null) return;
+function grabTasks(obj_data, need_projects_name, spreadsheetId, token, completed_tasks, default_name, type, is_refreshing, conifig_param_url_fetch) {
+  if(obj_data == null) return;
   var filtered_tasks = [];
-  var accept_project_entries = kts.getAcceptProjects(need_projects_name, data_p);
-  
-  for each(var row in data.items) {
-    var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, conifig_param_url_fetch);
+  var accept_project_entries = kts.getAcceptProjects(need_projects_name, obj_data.data_p);
+   
+  for each(var row in obj_data.data.items) {
+    var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, obj_data.data_p, obj_data.data_l, obj_data.data_c, default_name, conifig_param_url_fetch);
     if(item == null) continue;
     if (item.is_deleted == 1) continue;       
     var is_good = kts.checkAcceptProjectsId(accept_project_entries, item.project_id);
@@ -39,7 +36,7 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
     filtered_tasks = kts.insertItemArray(filtered_tasks, item);  
   }
   //
-  processTasks(filtered_tasks, true, spreadsheetId, token, type, conifig_param_url_fetch);  
+  if(filtered_tasks.length > 0) processTasks(filtered_tasks, true, spreadsheetId, token, type, conifig_param_url_fetch);  
 }
 function processTasks(arr, check_exists, spreadsheetId, token, type, conifig_param_url_fetch)
 {
@@ -133,7 +130,7 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
           need_change = true;
         }
         if(arr_change[i].priority == 2 && (arr_days[j].count_p2 + 1) <= arr_days[j].max_p2 && !need_change){
-          need_change = true;
+          need_change = true;           
         }
         if(arr_change[i].priority == 3 && (arr_days[j].count_p3 + 1) <= arr_days[j].max_p3 && !need_change){
           need_change = true;
