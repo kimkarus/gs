@@ -4,47 +4,62 @@ function myFunction() {
   var need_projects_name = kts.getProjectsFor(10, spreadsheetId);
   var default_name = kts.getProjectsFor(11, spreadsheetId).toString();
   var token = kts.getProjectsFor(9, spreadsheetId).toString();
-  var api_URL = "https://todoist.com/API/v7/sync";
-  var api_URL_completed_get_all = "https://todoist.com/api/v7/completed/get_all";
-  var api_URL_V8 = "https://beta.todoist.com/API/v8/";
   var conifig_param_url_fetch = [[6, 2],[7, 2], [8, 2]];
   initializeSheets(spreadsheetId);
   if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
-  var data_c = kts.getResource(api_URL, token, 7, '["collaborators"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-  var data_p = kts.getResource(api_URL, token, 7, '["projects"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-  var data_l = kts.getResource(api_URL, token, 7, '["labels"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-  var data = kts.getResource(api_URL, token, 7, '["items"]', null, null, null, spreadsheetId, conifig_param_url_fetch);
-
+  var obj_data = kts.getData(token, 7, spreadsheetId, conifig_param_url_fetch); 
+  //
   var count_c = 100;
   count_c = kts.getParamValue(3, spreadsheetId);
   var ipc_start = 0;
   //
-  var tmp_var = kts.getParamValue(2, spreadsheetId);
-  if(tmp_var > 0 && tmp_var < count_c) ipc_start = tmp_var;
+  var tmp_var2 = kts.getParamValue(2, spreadsheetId);
+  if(tmp_var2 > 0 && tmp_var2 < count_c) ipc_start = tmp_var2;
   //
-  var tmp_var3 = kts.getParamValue(4, spreadsheetId);
-  var tmp_var4 = kts.getParamValue(5, spreadsheetId);
+  var tmp_var4 = kts.getParamValue(4, spreadsheetId);
+  var tmp_var5 = kts.getParamValue(5, spreadsheetId);
+  var tmp_var12 = kts.getParamValue(12, spreadsheetId);
+  var tmp_var13 = kts.getParamValue(13, spreadsheetId);
+  var tmp_var14 = kts.getParamValue(14, spreadsheetId);
+  if(tmp_var12 == 0) tmp_var12 = false;
+  if(tmp_var12 == 1) tmp_var12 = true;
+  if(tmp_var13 == 0) tmp_var13 = false;
+  if(tmp_var13 == 1) tmp_var13 = true;
+  if(tmp_var12 != null && tmp_var12 != "") tmp_var12 = true;
+  if(tmp_var13 != null && tmp_var13 != "") tmp_var12 = true;
   //
   //
   var need_refresh_tasks = false;
   if(ipc_start <=0) need_refresh_tasks = true;
-  if(tmp_var3 == null || tmp_var3 == 0) need_refresh_tasks = true;
-  if(tmp_var3 != null) {
-    if(tmp_var > 0){
-      if((tmp_var / tmp_var4) > tmp_var3) need_refresh_tasks = true;
+  if(tmp_var4 == null || tmp_var4 == 0) need_refresh_tasks = true;
+  if(tmp_var4 != null) {
+    if(tmp_var2 > 0){
+      if((tmp_var2 / tmp_var4) > tmp_var5) need_refresh_tasks = true;
     }
   }
   //
-  if(need_refresh_tasks ) {
-    grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, false, default_name, "Work", true, conifig_param_url_fetch);
-    kts.setParamConfig("refreshed", Math.floor(tmp_var / tmp_var4), 4, spreadsheetId);
+  if(need_refresh_tasks && !tmp_var13){
+    grabTasks(obj_data, need_projects_name, spreadsheetId, token, false, default_name, "Work", false, conifig_param_url_fetch);
+    kts.setParamConfig("refreshed", Math.floor(tmp_var2 / tmp_var4), 4, spreadsheetId);
+    //
+    obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, conifig_param_url_fetch, ipc_start);
+    ipc_start++;
+    grabTasks(obj_data, need_projects_name, spreadsheetId, token, false, default_name, "Work", false, conifig_param_url_fetch);
+    kts.setParamConfig("completed_tasks_ipc", ipc_start, 2, spreadsheetId);
+    //
+    obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, conifig_param_url_fetch, 1);
+    grabTasks(obj_data, need_projects_name, spreadsheetId, token, false, default_name, "Work", false, conifig_param_url_fetch);
   }
   //
+  var count_ipc_index = 0;
   for(var ipc = ipc_start; ipc < count_c;  ipc++){
-    var data_completed_tasks = kts.getResource(api_URL_completed_get_all, token, 7, '["items"]', ipc, null, null, spreadsheetId, conifig_param_url_fetch);
+    if(count_ipc_index >= tmp_var14) break;
+    obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, conifig_param_url_fetch, ipc);
     kts.setParamConfig("completed_tasks_ipc", ipc, 2, spreadsheetId);
-    if(data_completed_tasks==null) break;
-    grabTasks(data_completed_tasks, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, true, default_name, "Work", false, conifig_param_url_fetch);
+    if(obj_data.data==null) break;
+    if(tmp_var13) tmp_var12 = false;
+    grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, "Work", tmp_var12, conifig_param_url_fetch);
+    count_ipc_index++;
   }
 }
 function initializeSheets(spreadsheetId)
@@ -53,16 +68,21 @@ function initializeSheets(spreadsheetId)
   kts.checkExistenceSheets(ss, "config");
   kts.checkExistenceSheets(ss, "Work");
 }
-function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshing, conifig_param_url_fetch) {
-  if(data == null || data_c == null || data_p == null) return;
+function grabTasks(obj_data, need_projects_name, spreadsheetId, token, completed_tasks, default_name, sheet_name, is_refreshing, conifig_param_url_fetch)
+{
+  if(obj_data == null || obj_data.data_c == null || obj_data.data_p == null) return;
   var all_tasks = [];
   var filtered_tasks = [];
-  var accept_project_entries = kts.getAcceptProjects(need_projects_name, data_p);
+  var accept_project_entries = kts.getAcceptProjects(need_projects_name, obj_data.data_p);
+  var deleted_tasks = [];
   
-  for each(var row in data.items) {
-    var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, conifig_param_url_fetch);
+  for each(var row in obj_data.data.items) {
+    var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, obj_data.data_p, obj_data.data_l, obj_data.data_c, default_name, conifig_param_url_fetch);
     if(item == null) continue;
-    if (item.is_deleted == 1) continue;
+    if (item.is_deleted == 1) {
+      deleted_tasks = kts.insertItemArray(deleted_tasks, item); 
+      continue;
+    }
     all_tasks = kts.insertItemArray(all_tasks, item);           
     var is_good = kts.checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
@@ -74,7 +94,7 @@ function grabTasks(data, data_c, data_p, data_l, need_projects_name, spreadsheet
   Logger.log("allTasks: " + all_tasks.length);
   Logger.log("allTasks: " + filtered_tasks.length);
   processTasks(sheet_name, ss, filtered_tasks, false, true, spreadsheetId, token, conifig_param_url_fetch);
-  
+  deleteTasks(sheet_name, ss, deleted_tasks, false, true, spreadsheetId, token, conifig_param_url_fetch);
 }
 function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadsheetId, token)
 {
@@ -83,43 +103,174 @@ function processTasks(sheet_name, ss, arr, clean_range, check_exists, spreadshee
   setHeader(sheet, ss);
   fillSheet(arr, sheet, check_exists, spreadsheetId, token);  
 }
+function deleteTasks(sheet_name, ss, arr, clean_range, check_exists, spreadsheetId, token)
+{
+  var sheet = ss.getSheetByName(sheet_name);
+ //if(clean_range) sheet.clear();
+  //setHeader(sheet, ss);
+  deleteFromSheet(arr, sheet, check_exists, spreadsheetId, token);  
+}
 function fillSheet(arr, sheet, check_exists, spreadsheetId, token)
 {
-  var maxRows = kts.getMaxCountRows(sheet);
   var sheet_values = sheet.getDataRange().getValues();
+  var maxRows = sheet_values.length;
   for (i = 0; i < arr.length; i++)
   {
     var index = i;
-    maxRows = kts.getMaxCountRows(sheet);
-    var row_number = checkItimeId(arr[index].id, sheet_values, maxRows, check_exists);
+    var row_number = -1;
+    maxRows = sheet_values.length;
+    row_number = checkItimeId(arr[index].id, sheet_values, maxRows, check_exists);
     if(row_number >= 0){
-      sheet_values = modifyItem(arr[index], sheet, row_number, spreadsheetId, token, sheet_values);
-    } 
-  }
-  //
-  var range = sheet.getDataRange();
-  try{
-    range.setValues(sheet_values);
-  } catch(e){
-    Logger.log("error: " + e);
-  }
-  //
-  for (i = 0; i < arr.length; i++)
-  {
-    var index = i;
-    maxRows = kts.getMaxCountRows(sheet);
-    var row_number = checkItimeId(arr[index].id, sheet_values, maxRows, check_exists);
-    if(row_number >= 0){
-      //modifyItem(arr[index], sheet, row_number, spreadsheetId, token, sheet_values);
+      arr[index] = checkItemChanges(arr[index], sheet, row_number, sheet_values);
+      addModifyItem(arr[index], sheet, row_number, true, spreadsheetId, token, sheet_values);
     } else {
-      addModifyItem(arr[index], sheet, maxRows+1);
       maxRows = maxRows+1;
+      addModifyItem(arr[index], sheet, maxRows, false);
       sheet_values = sheet.getDataRange().getValues();
     }
   }
+}
+function deleteFromSheet(arr, sheet, check_exists, spreadsheetId, token)
+{
+  var sheet_values = sheet.getDataRange().getValues();
+  var maxRows = sheet_values.length;
+  for (i = 0; i < arr.length; i++)
+  {
+    var index = i;
+    var row_number = -1;
+    maxRows = sheet_values.length;
+    row_number = checkItimeId(arr[index].id, sheet_values, maxRows, check_exists);
+    if(row_number >= 0){
+      arr[index] = checkItemChanges(arr[index], sheet, row_number, sheet_values);
+      deleteItem(arr[index], sheet, row_number, true, spreadsheetId, token, sheet_values);
+      sheet_values = sheet.getDataRange().getValues();
+    }
+  }
+}
+function deleteItem(item, sheet, row_number, change, spreadsheetId, token, sheet_values)
+{
+  sheet.deleteRow(row_number+1);
+}
+function addModifyItem(item, sheet, row_number, change, spreadsheetId, token, sheet_values)
+{
+  if(change){
+    modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values);
+  } else {
+    addNewItem(item, sheet, row_number);
+  }
+}
+function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
+{
+  if(item.id_modified <= 0) return;
+  var arr = kts.insertItemArrayIndexes(item);
+  for(var j = 0; j < 26; j++){
+    if(arr[j] == "" || arr[j] == null) continue;
+    if(arr[j].toString() == "undefined") continue;
+    //sheet_values[row_number][j] = arr[j];
+    sheet.getRange(row_number + 1, j + 1, 1, 1).setValue(arr[j]);
+  }
+  var labels = item.labels;
+  var index_col_start = 26;
+  if(labels != null && labels.length > 0){
+    for (var i = 0; i < labels.length; i++){
+      var label = labels[i].toString();
+      //sheet_values[row_number, index_col_start + i] = label;
+      sheet.getRange(row_number + 1, index_col_start + i + 1, 1, 1).setValue(label);
+    }
+  }
+}
+function checkItemChanges(item, sheet, row_number, sheet_values)
+{
+  //item.id_modified = -1;
+  var is_completed = sheet.getRange(row_number + 1, 13, 1, 1).getValues()[0][0];
+  //var is_completed = sheet_values[row_number][12];
+  var item_is_completed = item.completed;
+  if(is_completed != item_is_completed)   {
+    item.id_modified = 1;
+  }
+  //
+  var name = sheet.getRange(row_number + 1, 9, 1, 1).getValues()[0][0];
+  //var name = sheet_values[row_number][8];
+  var item_name = item.content;
+  if(name != item_name)   {
+    item.id_modified = 2;
+  }
+  //
+  var responsible_uid = sheet.getRange(row_number + 1, 11, 1, 1).getValues()[0][0];
+  //var responsible_uid = sheet_values[row_number][10];
+  var item_responsible_uid = item.responsible_uid;
+  if(responsible_uid != item_responsible_uid && item_responsible_uid != null)   {
+    item.id_modified = 3;
+  }
+  //
+  var priority = sheet.getRange(row_number + 1, 10, 1, 1).getValues()[0][0];
+  //var priority = sheet_values[row_number][9];
+  var item_priority = item.priority;
+  if(priority != item_priority)   {
+    item.id_modified = 4;
+  }
+  var day_completed = sheet.getRange(row_number + 1, 6, 1, 1).getValues()[0][0];
+  //var day_completed = sheet_values[row_number][5];
+  var item_day_completed = item.day_completed;
+  if(day_completed != item_day_completed)   {
+    item.id_modified = 5;
+  }
+  var due_date_utc = sheet.getRange(row_number + 1, 2, 1, 1).getValues()[0][0];
+  //var day_completed = sheet_values[row_number][5];
+  var item_due_date_utc = item.due_date_utc;
+  if(due_date_utc != item_due_date_utc)   {
+    item.id_modified = 6;
+  }
+  var label = sheet.getRange(row_number + 1, 27, 1, 1).getValues()[0][0];
+  var item_label = item.labels[0];
+  if(label != item_label) {
+    item.id_modified = 7;
+  }
   
-  
-  //sheet.getDataRange().setValues(sheet_values);
+  return (item);
+}
+
+function addNewItem(item, sheet, row_number)
+{
+  var arr = kts.insertItemArrayIndexes(item);
+  // if(id_modified > 0){
+  for(var j = 0; j < 26; j++){
+    if(arr[j] == "" || arr[j] == null) continue;
+    if(arr[j].toString() == "undefined") continue;
+    sheet.getRange(row_number, j+1, 1, 1).setValue(arr[j]);
+  }
+  //}
+  //labels
+  var labels = item.labels;
+  var index_col_start = 26;
+  if(labels != null){
+    var count_l = labels.length;
+    if(count_l > 0){
+      for (var i = 0; i < count_l; i++){
+        var label = labels[i].toString();
+        sheet.getRange(row_number, index_col_start+i, 1, 1).setValue(label);
+      }
+    }
+  }
+}
+function checkItimeId(item_id, sheet_values, count, check_exists)
+{
+  var index = -1;
+  if(!check_exists) return(index);
+  item_id = item_id.toString();
+  for(j=0; j < count; j++)
+  {
+    var sheet_item_id = -1;
+    index = -1;
+    if(sheet_values[j][16] == null || sheet_values[j][16] == "") continue;
+    sheet_item_id = sheet_values[j][16].toString();
+    if(sheet_item_id == item_id)
+    {
+      index = j;
+      break;
+    }
+  }
+  return (index);
 }
 function setHeader(sheet, ss)
 {
@@ -177,131 +328,4 @@ function setHeader(sheet, ss)
   sheet.getRange(1, 26, 1, 1).setValue("Количество");
   //Labels
   sheet.getRange(1, 27, 1, 1).setValue("Теги:");
-}
-function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
-{
-  var id_modified = -1;
-  
-  //var is_completed = sheet.getRange(row_number, 13, 1, 1).getValues()[0][0];
-  var is_completed = sheet_values[row_number][12];
-  var item_is_completed = item.completed;
-  if(is_completed != item_is_completed) 
-  {
-    id_modified = 1;
-  }
-  //
-  //var name = sheet.getRange(row_number, 9, 1, 1).getValues()[0][0];
-  var name = sheet_values[row_number][8];
-  var item_name = item.content;
-  if(name != item_name) 
-  {
-    id_modified = 2;
-  }
-  //
-  //var responsible_uid = sheet.getRange(row_number, 11, 1, 1).getValues()[0][0];
-  var responsible_uid = sheet_values[row_number][10];
-  var item_responsible_uid = item.responsible_uid;
-  if(responsible_uid != item_responsible_uid && item_responsible_uid != null) 
-  {
-    id_modified = 3;
-  }
-  //
-  //var priority = sheet.getRange(row_number, 10, 1, 1).getValues()[0][0];
-  var priority = sheet_values[row_number][9];
-  var item_priority = item.priority;
-  if(priority != item_priority) 
-  {
-    id_modified = 4;
-  }
-  //var day_completed = sheet.getRange(row_number, 6, 1, 1).getValues()[0][0];
-  var day_completed = sheet_values[row_number][5];
-  var item_day_completed = item.day_completed;
-  if(day_completed != item_day_completed) 
-  {
-    id_modified = 5;
-  }
-  var arr = kts.insertItemArrayIndexes(item);
-  if(id_modified > 0){
-    for(var j = 0; j < 26; j++){
-      if(arr[j] == "" || arr[j] == null) continue;
-      sheet_values[row_number][j] = arr[j];
-    }
-  }
-  //var label = sheet.getRange(row_number, 27, 1, 1).getValues()[0][0];
-  var label = sheet_values[row_number][26];
-  var item_label = item.labels[0];
-  if(label != item_label) 
-  {
-    id_modified = 7;
-    var labels = item.labels;
-    var index_col_start = 26;
-    if(labels != null){
-      var count_l = labels.length;
-      if(count_l > 0){
-        for (var i = 0; i < count_l; i++){
-          var label = labels[i].toString();
-          sheet_values[row_number, index_col_start] = label;
-        }
-      }
-    }
-  }
-  //
-  item.id_modified = id_modified.toString();
-  
-  if(id_modified > 0) {
-    sheet_values[row_number][18] = item.id_modified;
-    //addModifyItem(item, sheet, row_number, sheet_values);
-  }
-  return (sheet_values);
-}
-function addModifyItem(item, sheet, row_number, id_modified, sheet_values)
-{
-  var now = new Date();
-  if(id_modified != "" || id_modified != null){
-    //sheet.getDataRange().setValues(sheet_values);
-  } else {
-    addNewItem(item, sheet, row_number, id_modified);
-  }
-  
-}
-function addNewItem(item, sheet, row_number, id_modified)
-{
-  var arr = kts.insertItemArrayIndexes(item);
-  if(id_modified > 0){
-    for(var j = 0; j < 26; j++){
-      if(arr[j] == "" || arr[j] == null) continue;
-      sheet.getRange(row_number, j+1, 1, 1).setValue(arr[j]);
-    }
-  }
-  //labels
-  var labels = item[26];
-  var index_col_start = 27;
-  if(labels != null){
-     var count_l = labels.length;
-     if(count_l > 0){
-       for (var i = 0; i < count_l; i++){
-         var label = labels[i].toString();
-         sheet.getRange(row_number, index_col_start+i, 1, 1).setValue(label);
-      }
-    }
-  }
-}
-function checkItimeId(item_id, sheet_values, count, check_exists)
-{
-  var index = -1;
-  if(!check_exists) return(index);
-  item_id = item_id.toString();
-  for(j=0; j < count; j++)
-  {
-    var sheet_item_id = -1;
-    index = -1;
-    if(sheet_values[j][16] == null || sheet_values[j][16] == "") continue;
-    sheet_item_id = sheet_values[j][16].toString();
-    if(sheet_item_id == item_id)
-    {
-      index = j+1;
-      break;
-    }
-  }
-  return (index);
 }
