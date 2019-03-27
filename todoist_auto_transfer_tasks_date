@@ -1,13 +1,10 @@
 function myFunction() {
-  var spreadsheetId = "<sheet id>";
+  var spreadsheetId = "1fdVuNRwco5FBUHRdTJF0R7_fa-BhU4L6AFCp5F8jDCw";
   //
   var need_projects_name_for_home = kts.getProjectsFor(2, spreadsheetId);
   var need_projects_name_for_work = kts.getProjectsFor(3, spreadsheetId);
   var default_name = kts.getParamValue(6, spreadsheetId, 2).toString();
   var token = kts.getParamValue(10, spreadsheetId, 2).toString();
-  var api_URL = "https://todoist.com/API/v7/sync";
-  var api_URL_completed_get_all = "https://todoist.com/api/v7/completed/get_all";
-  var api_URL_V8 = "https://beta.todoist.com/API/v8/";
   initializeSheets(spreadsheetId);
   var conifig_param_url_fetch = [[17, 2],[18, 2], [19, 2]];
   if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
@@ -30,7 +27,8 @@ function grabTasks(obj_data, need_projects_name, spreadsheetId, token, completed
   for each(var row in obj_data.data.items) {
     var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, obj_data.data_p, obj_data.data_l, obj_data.data_c, default_name, conifig_param_url_fetch);
     if(item == null) continue;
-    if (item.is_deleted == 1) continue;       
+    if (item.is_deleted == 1) continue;
+    if(default_name != item.user_name) continue;
     var is_good = kts.checkAcceptProjectsId(accept_project_entries, item.project_id);
     if(!is_good) continue;
     filtered_tasks = kts.insertItemArray(filtered_tasks, item);  
@@ -71,6 +69,7 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
   var max_min_date = obj_arr.max_min_date;
   arr = obj_arr.arr;
   for each(var item in arr){
+    if(item.week_due == null || item.week_due == "") continue;
     if(item.week_due > now_week) continue;
     var index = item.day_of_week_due-1;
     if(index < 0) continue;
