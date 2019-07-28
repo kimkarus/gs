@@ -1,191 +1,830 @@
-function myFunction() {
-  var spreadsheetId = "1fdVuNRwco5FBUHRdTJF0R7_fa-BhU4L6AFCp5F8jDCw";
+function getResource(api_url, token, api_version, resource_type, ipc, id, field_name, spreadsheetId, config){
   //
-  var need_projects_name_for_home = kts.getProjectsFor(2, spreadsheetId);
-  var need_projects_name_for_work = kts.getProjectsFor(3, spreadsheetId);
-  var default_name = kts.getParamValue(6, spreadsheetId, 2).toString();
-  var token = kts.getParamValue(10, spreadsheetId, 2).toString();
-  initializeSheets(spreadsheetId);
-  var conifig_param_url_fetch = [[17, 2],[18, 2], [19, 2]];
-  if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
-  var obj_data = kts.getData(token, 7, spreadsheetId, conifig_param_url_fetch);
+  if(api_url == "" || api_url == null) api_url = "https://todoist.com/API/v7/sync";
+  var api_url_V8 = "https://beta.todoist.com/API/v8/";
   //
-  grabTasks(obj_data, need_projects_name_for_home, spreadsheetId, token, false, default_name, "home", false, conifig_param_url_fetch);
-  //
-  grabTasks(obj_data, need_projects_name_for_work, spreadsheetId, token, false, default_name, "work", false, conifig_param_url_fetch);
-}
-function initializeSheets(spreadsheetId)
-{
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  kts.checkExistenceSheets(ss, "config");
-}
-function grabTasks(obj_data, need_projects_name, spreadsheetId, token, completed_tasks, default_name, type, is_refreshing, conifig_param_url_fetch) {
-  if(obj_data == null) return;
-  var filtered_tasks = [];
-  var accept_project_entries = kts.getAcceptProjects(need_projects_name, obj_data.data_p);
-   
-  for each(var row in obj_data.data.items) {
-    var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, obj_data.data_p, obj_data.data_l, obj_data.data_c, default_name, conifig_param_url_fetch);
-    if(item == null) continue;
-    if (item.is_deleted == 1) continue;
-    if(default_name != item.user_name) continue;
-    var is_good = kts.checkAcceptProjectsId(accept_project_entries, item.project_id);
-    if(!is_good) continue;
-    filtered_tasks = kts.insertItemArray(filtered_tasks, item);  
+  var payload = null;
+  if(api_version == 7){
+    payload = getPayloadV7(resource_type, token, ipc, id, field_name);
   }
-  //
-  if(filtered_tasks.length > 0) processTasks(filtered_tasks, true, spreadsheetId, token, type, conifig_param_url_fetch);  
-}
-function processTasks(arr, check_exists, spreadsheetId, token, type, conifig_param_url_fetch)
-{
-  var p = getP(spreadsheetId, type);
-  var day_max = kts.getMaxDay(spreadsheetId, type);
-  var now = new Date();
-  var arr_days = kts.createEmptyWeek(day_max, p, now);
-  
-  var group_tasks_out = sortTasks(arr, arr_days, type, spreadsheetId);
-  
-  moveTasks(group_tasks_out, token, spreadsheetId, type, conifig_param_url_fetch);
-}
-function moveTasks(arr, token, spreadsheetId, type, conifig_param_url_fetch)
-{
-  kts.updateTasks('["items"]', "item_update", token, arr, spreadsheetId, conifig_param_url_fetch);
-}
-function sortTasks(arr, arr_days, type, spreadsheetId)
-{
-  var arr_move = [];
-  var arr_change = [];
-  type = type.toUpperCase();
-  //
-  var now = new Date();
-  var now_day = kts.getWeekDay(now);
-  var now_month = now.getMonth() + 1;
-  //var firstDay = new Date(now.getFullYear(), now.getMonth(), 1); // return first day of the month
-  var now_week = kts.getWeekNumber(now); 
-  var date_next_week = kts.getDate(kts.getDateNextWeek(now));
-  var count_previous_days = kts.getNumberString(kts.getParamValue(9, spreadsheetId, 2));
-  //
-  var obj_arr = kts.arrSortAscItemsByName(arr, "date_added", "date");
-  var max_min_date = obj_arr.max_min_date;
-  arr = obj_arr.arr;
-  for each(var item in arr){
-    if(item.week_due == null || item.week_due == "") continue;
-    if(item.week_due > now_week) continue;
-    var index = item.day_of_week_due-1;
-    if(index < 0) continue;
-    arr_days[index].items.push(item);
-    arr_days[index].day_count++;
-    if(item.priority == 1) arr_days[index].count_p1++;
-    if(item.priority == 2) arr_days[index].count_p2++;
-    if(item.priority == 3) arr_days[index].count_p3++;
-    if(item.priority == 4) arr_days[index].count_p4++;
+  if(api_version == 8){
+    payload = getPayloadV8(resource_type, token, ipc, id, field_name);
   }
-  //
-  for(var i = 0; i < arr_days.length; i++){
-      for(var j = arr_days[i].items.length - 1; j >= 0; j--){
-        var need_change = false;
-        if(arr_days[i].day < now_day - count_previous_days){
-          need_change = true;
-        }
-        if(type == "WORK" && arr_days[i].day >= 6 && !need_change){
-          need_change = true;
-        }
-        if(arr_days[i].items[j].priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1 && !need_change){
-          need_change = true;
-        }
-        if(arr_days[i].items[j].priority == 2 && arr_days[i].count_p2 > arr_days[i].max_p2 && !need_change){
-          need_change = true;
-        }
-        if(arr_days[i].items[j].priority == 3 && arr_days[i].count_p3 > arr_days[i].max_p3 && !need_change){
-          need_change = true;
-        }
-        if(arr_days[i].items[j].priority == 4 && arr_days[i].count_p4 > arr_days[i].max_p4 && !need_change){
-          need_change = true;
-        }
-        if(need_change){
-          if(arr_days[i].items[j].priority == 1) arr_days[i].count_p1--;
-          if(arr_days[i].items[j].priority == 2) arr_days[i].count_p2--;
-          if(arr_days[i].items[j].priority == 3) arr_days[i].count_p3--;
-          if(arr_days[i].items[j].priority == 4) arr_days[i].count_p4--;
-          arr_days[i].day_count--;
-          arr_change.push(arr_days[i].items[j]);
-          arr_days[i].items.splice(j, 1);
-          j = arr_days[i].items.length - 1;
-        }
-      }
+  if(api_version == 8){
+    api_url = api_url_V8+resource_type;
   }
-  var t1 = "";
-  for (var i = 0; i < arr_change.length; i++){
-    var need_change = false;
-    arr_change[i].due_date_utc = date_next_week;
-    //
-    if(arr_change[i].day_of_week_due  < now_day - count_previous_days) continue;
-    if(type == "WORK" && arr_change[i].day_of_week_due >= 6 && !need_change) continue;
-    for(var j = 0; j < arr_days.length; j++){
+   var options = getOptions(payload);
+   var content = getResponseContent(api_url, options, spreadsheetId, config);
 
-      if(arr_days[j].day_count < arr_days[j].day_max){
-        
-        if(arr_change[i].priority == 1 && (arr_days[j].count_p1 + 1) <= arr_days[j].max_p1 && !need_change){
-          need_change = true;
-        }
-        if(arr_change[i].priority == 2 && (arr_days[j].count_p2 + 1) <= arr_days[j].max_p2 && !need_change){
-          need_change = true;           
-        }
-        if(arr_change[i].priority == 3 && (arr_days[j].count_p3 + 1) <= arr_days[j].max_p3 && !need_change){
-          need_change = true;
-        }
-        if(arr_change[i].priority == 4 && (arr_days[j].count_p4 + 1) <= arr_days[j].max_p4 && !need_change){
-          need_change = true;
-        }
-        if(need_change){
-          if(arr_change[i].priority == 1) arr_days[j].count_p1++;
-          if(arr_change[i].priority == 2) arr_days[j].count_p2++;
-          if(arr_change[i].priority == 3) arr_days[j].count_p3++;
-          if(arr_change[i].priority == 4) arr_days[j].count_p4++;
-          arr_days[j].day_count++;
-          arr_change[i].due_date_utc = arr_days[j].date;
-          break;
-        }
-      }
-      
-    }
-    //
-    if(!need_change){
-      for(var j = 0; j < arr_days.length; j++){
-        if(arr_days[j].day_count < arr_days[j].day_max){
-          if(arr_change[i].priority == 4 && (arr_days[j].day_count + 1) <= arr_days[j].day_max && !need_change){
-            need_change = true;
-          }
-          if(arr_change[i].priority == 3 && (arr_days[j].day_count + 1) <= arr_days[j].day_max && !need_change){
-            need_change = true;
-          }
-          if(need_change){
-            if(arr_change[i].priority == 3) arr_days[j].count_p3++;
-            if(arr_change[i].priority == 4) arr_days[j].count_p4++;
-            arr_days[j].day_count++;
-            arr_change[i].due_date_utc = arr_days[j].date;
-            break;
-          }
-        }
-      }
-      
-    }
-  }
-  //
-  return (arr_change);
+  return(content);
 }
-function getP(spreadsheetId, type)
+function getData(token, api_version, spreadsheetId, config)
 {
-  type = type.toUpperCase();
-  var row_number = 0;
-  var arr = [];
-  if(type == "HOME") row_number = 7;
-  if(type == "WORK") row_number = 8;
-  for(var i=0;i<4;i++){
-    var value = kts.getParamValue(row_number, spreadsheetId, i+3);
-    arr.push(kts.getNumberString(value));
+  var obj = new Object();
+  obj.data_c = getResource("", token, api_version, '["collaborators"]', null, null, null, spreadsheetId, config);
+  obj.data_p = getResource("", token, api_version, '["projects"]', null, null, null, spreadsheetId, config);
+  obj.data_l = getResource("", token, api_version, '["labels"]', null, null, null, spreadsheetId, config);
+  obj.data = getResource("", token, api_version, '["items"]', null, null, null, spreadsheetId, config);
+  return(obj);
+}
+function getDataCompleted(token, api_version, spreadsheetId, config, ipc)
+{
+  var api_url = "https://todoist.com/api/v7/completed/get_all";
+  var data = getResource(api_url, token, api_version, '["items"]', ipc, null, null, spreadsheetId, config);
+  return(data);
+}
+function getOptions(payload, method, commands)
+{
+  if(method == null || method == "") method = "get";
+  var options = null;
+
+  options = {
+    method : method,
+    payload : payload,
+    contentType: 'application/x-www-form-urlencoded',
+    muteHttpExceptions : true
+  };
+
+  return(options);
+}
+function getPayloadV7(resource_type, token, ipc, id, field_name)
+{
+  var payload = null;
+  if(ipc != null){
+    payload =
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
+  } else {
+    if(id != null){
+      if(field_name == "item_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "item_id" : id.toString()
+          };
+      }
+      if(field_name == "label_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
+      }
+      
+    } else {
+      payload =
+        {
+          "token" : token,
+          "sync_token": '*',
+          "resource_types" : resource_type
+        };
+    }
   }
   
-  arr = kts.convertArrStringToNumber(arr);
+  return(payload);
+}
+function getPayloadUpdateV7(resource_type, type, token, items, commands)
+{
+  var payload = null;
+
+  payload =
+    {
+      "token" : token,
+      "sync_token" : '*',
+      "resource_types" : resource_type,
+      "commands" : commands
+    };
+  
+  return(payload);
+}
+function getCommands(items, type, max_count)
+{
+  var commands = [];
+  if(max_count == null || max_count == "") max_count = 100;
+  var count = 0;
+  for each(var item in items){
+    //var args = [];
+    var args = {
+      "id": item.id.toString(), 
+      "due_date_utc": getDatePost(item.due_date_utc)
+    };
+    //args.push(arg);
+    //
+    var common = {
+      "type":  type,
+      "temp_id": uuidv4(),
+      "uuid": uuidv4(),
+      "args": args
+    };
+    commands.push(common);
+    count++;
+    if(count >= max_count) break;
+  }
+  commands = JSON.stringify(commands);
+  
+  return (commands);
+}
+function getPayloadV8(resource_type, token, ipc, id, field_name)
+{
+  var payload = null;
+  if(ipc != null){
+    payload =
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
+  } else {
+    if(id != null){
+      if(field_name == "item_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "item_id" : id.toString()
+          };
+      }
+      if(field_name == "label_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
+      }
+      
+    } else {
+      payload =
+        {
+          "Authorization": "Bearer "+token
+        };
+    }
+  }
+  
+  return(payload);
+}
+
+function getResponseContent(apiURL, options, spreadsheetId, config)
+{
+  if(!checkUrlfetch(spreadsheetId, false, config)) return(null);
+  //
+  var response = UrlFetchApp.fetch(apiURL, options);
+  var response_content_text = response.getContentText();
+  var content = null;
+  if(response_content_text != null && response_content_text != "") {
+    try{
+      content = JSON.parse(response_content_text);
+    } catch (e){
+      content = null;
+    }
+  }
+  return(content);
+}
+function checkExistenceSheets(ss, sheet_name)
+{
+  if (ss.getSheetByName(sheet_name) == null){
+    ss.insertSheet(sheet_name);
+  }
+}
+function getProjectsFor(row_number, spreadsheetId)
+{
+  var tmp = getParamValue(row_number, spreadsheetId);
+  if(tmp.toString().length <= 0) return (null);
+  if(tmp.toString().indexOf(",") > -1){
+    var arr = tmp.split(", ");
+  } else {
+    return (null);
+  }
   return (arr);
+}
+function insertItemArray(arr, item)
+{
+  arr.push(item);
+  
+  return (arr);
+}
+function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, config)
+{
+  var item_new = getEmptyItemForTask();
+  var item_refreshed = null;
+  if(item == null || item == "") return (null);
+  if(completed_tasks) item_new = getFillForCompleted(item_new, item);
+  //if(item_new != null) item = item_new;
+  if(is_refreshing) item_refreshed = getSingleItem(token, item.id, spreadsheetId, config);
+  if(item_refreshed != null) item_new = item_refreshed;
+  //
+  var obj_dates = getDates(item, completed_tasks, is_refreshing);
+  //date_completed
+  item_new.date_completed = obj_dates.date_completed;
+  item_new.year_completed = obj_dates.year_completed;
+  item_new.month_completed = obj_dates.month_completed;
+  item_new.day_completed = obj_dates.day_completed;
+  item_new.day_of_week_completed = obj_dates.day_of_week_completed;
+  item_new.week_completed = obj_dates.week_completed;
+  //date_added 
+  item_new.date_added = obj_dates.date_added;
+  item_new.year_added = obj_dates.year_added;
+  item_new.month_added = obj_dates.month_added;
+  item_new.week_added = obj_dates.week_added;
+  //date_due
+  item_new.due_date_utc = obj_dates.due_date_utc; 
+  item_new.year_due = obj_dates.year_due;
+  item_new.month_due = obj_dates.month_due;
+  item_new.day_due = obj_dates.day_due;
+  item_new.day_of_week_due = obj_dates.day_of_week_due;
+  item_new.week_due = obj_dates.week_due;
+  //now
+  item_new.now = obj_dates.now;
+  item_new.now_time = obj_dates.now_time;
+  //
+  if(item.project_id != null && item.project_id != ""){
+    item_new.project_id = item.project_id;
+    var project = getProject(data_p.projects, item_new.project_id);
+    if(project!=null) item_new.project_name = project.name;
+    item_new.project_id = item_new.project_id.toString();
+  }
+  //
+  if(completed_tasks){
+    var obj_content = getContentLabels(item.content);
+    item_new.content = obj_content.content;
+    item_new.labels = obj_content.labels;
+    item_new.completed = 1;
+  }
+  if(!completed_tasks || is_refreshing){
+    item_new.labels = getLabelNames(item.labels, data_l, "", token, spreadsheetId);
+    item_new.content = item.content;
+    item_new.all_day = item.all_day;
+    item_new.is_deleted = item.is_deleted;
+    item_new.priority = item.priority;
+    item_new.completed = item.checked;
+    if(item.responsible_uid != null) item_new.responsible_uid = item.responsible_uid.toString();
+    item_new.user_name = getUserName(data_c.collaborators, item_new.responsible_uid, default_name);
+  }
+  item_new.id = item.id.toString();
+  //
+  return (item_new);
+}
+function getDates(item, completed_tasks, is_refreshing)
+{
+  var obj = new Object();
+  var is_date_completed = false;
+  if(!completed_tasks || is_refreshing){
+    obj.date_added = getNewDate(item.date_added);
+    obj.due_date_utc = getNewDate(item.due_date_utc);
+    //
+    if(item.due_date_utc != null && item.due_date_utc != ""){
+      obj.year_due = getYear(item.due_date_utc);
+      obj.month_due = getMonth(item.due_date_utc);
+      obj.day_due = getDayMonth(item.due_date_utc);
+      obj.day_of_week_due = getWeekDay(item.due_date_utc);
+      obj.week_due = getWeekNumber(item.due_date_utc);
+    }
+    if(item.date_added != null && item.date_added != ""){
+      obj.year_added = getYear(item.date_added);
+      obj.month_added = getMonth(item.date_adde);
+      obj.week_added = getWeekNumber(item.date_added);
+    }
+    obj.date_added = getDate(item.date_added);
+    obj.due_date_utc = getDate(item.due_date_utc);
+  }
+  //
+  if(completed_tasks){
+    obj.date_completed = getNewDate(item.date_completed);
+    if(item.date_completed != null && item.date_completed != ""){
+      obj.year_completed = getYear(item.date_completed);
+      obj.month_completed = getMonth(item.date_completed);
+      obj.day_completed = getDayMonth(item.date_completed);
+      obj.day_of_week_completed = getWeekDay(item.date_completed);
+      obj.week_completed = getWeekNumber(item.date_completed);
+    }
+    obj.date_completed = getDate(item.date_completed);
+  } 
+  obj.now = new Date();
+  obj.now_time = obj.now.getTime();
+  
+  return (obj);
+}
+function getContentLabels(value)
+{
+  var obj = new Object();
+  valeu = value.toString();
+  //
+  var index_labels = value.indexOf("@");
+  if(index_labels >=0){
+    obj.labels = [];
+    obj.content = value.substring(0, index_labels - 1);
+    var labels = value.substring(index_labels, value.length);
+    var tmp_labels = labels.split("@");
+    for(var i = 0; i < tmp_labels.length; i++){
+      var str = tmp_labels[i].trim();
+      if(str != "" && str != null) obj.labels.push(str);
+    }
+  } else {
+    obj.content = value;
+    obj.labels = [];
+  }
+  return (obj);
+}
+function getEmptyItemForTask()
+{
+  var item = new Object();
+  item.completed = 0;
+  item.is_deleted = false;
+  item.labels = [];
+  //
+  item.due_date_utc = "";
+  item.year_due = "";
+  item.month_due = "";
+  item.day_due = "";
+  item.day_of_week_due = "";
+  item.week_due = "";
+  //
+  item.date_added = "";
+  item.year_added = "";
+  item.month_added = "";
+  item.week_added = "";
+  //
+  item.date_completed = "";
+  item.year_completed = "";
+  item.month_completed = "";
+  item.day_completed = "";
+  item.day_of_week_completed = "";
+  item.week_completed = "";
+  //
+  item.project_id = "";
+  item.responsible_uid = "";
+  item.all_day = false;
+  item.content = "";
+  item.priority = 1;
+  item.id = "";
+  item.now = "";
+  item.now_item = "";
+  item.user_name = "";
+  item.project_name = "";
+  item.responsible_uid = 0;
+  item.id_modified = -1;
+  
+  return (item);
+}
+function checkAcceptProjectsId(arr, need_id)
+{
+  if(arr == null) return(true);
+  if(need_id == null) return(false);
+  for each(var row in arr) {
+    if(row == need_id)return(true);
+  }
+  return(false);
+}
+function getSingleItem(token, id, spreadsheetId, config)
+{
+  var apiURL = "https://todoist.com/api/v7/items/get";
+  var item = null;
+  var data = getResource(apiURL, token, 7, '["item"]', null, id, "item_id", spreadsheetId, config);
+  if(data != null) item = data.item;
+  return(item);
+}
+function getFillForCompleted(item, row)
+{
+  //item.responsible_uid = row.user_id;
+  item.user_id = row.user_id;
+  item.id = row.id;
+  item.project_id = row.project_id;
+  item.date_completed = row.completed_date;
+  
+  return (item);
+}
+function convertArrStringToNumber(arr)
+{
+  var count = arr.length;
+  for(var i = 0; i< count; i++){
+    arr[i] = getNumberString(arr[i]);
+  }
+  return (arr);
+}
+function getNumberString(str)
+{
+  var tmp = -1;
+  if(str == null || str == "") return (tmp);
+  tmp = Number(str);
+  return(tmp);
+}
+function getMaxDay(spreadsheetId, type)
+{
+  var tmp = 1;
+  type = type.toUpperCase();
+  if(type == "HOME") tmp = getParamValue(4, spreadsheetId);
+  if(type == "WORK") tmp = getParamValue(5, spreadsheetId);
+  tmp = getNumberString(tmp);
+  
+  return(tmp);
+}
+function getUserName(arr, need_id, default_name)
+{
+  var name = default_name;
+  if(arr == null) return(name);
+  if(need_id == 0 || need_id == null || need_id == "") return(name);
+
+  for each(var row in arr){
+    if(row.id == need_id) {
+      name = row.full_name;
+      break;
+    }
+  }
+
+  return(name);
+}
+function getLabelNames(arr, labels, default_name, token, spreadsheetId)
+{
+  var name = default_name;
+  
+  if(arr == null) {
+    arr = new Array();
+    arr.push([""]);
+    return(arr);
+  }
+  var count = arr.length;
+  
+  for (var i = 0; i < count; i++){
+    arr[i] = getLabelName(arr[i].toString(), labels, "", token, spreadsheetId);
+  }
+
+  return(arr);
+}
+function getLabelName(need_id, labels, default_name, token, spreadsheetId)
+{
+  var name = default_name;
+
+  if(need_id == 0 || need_id == null || need_id == "" || labels == null) return(name);
+  for each(var row in labels.labels){
+    if(row.id == need_id) return (row.name);
+  }
+}
+function setParamConfig(param_name, value, row_number, spreadsheetId, column_number)
+{
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName("config");
+  //
+  sheet.getRange(row_number, 1, 1, 1).setValue(param_name);
+  sheet.getRange(row_number, 2, 1, 1).setValue(value);
+}
+function getParamValue(row_number, spreadsheetId, column_number)
+{
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName("config");
+  var value = null;
+  if(column_number == null || column_number < 1){
+    value = sheet.getRange(row_number, 2, 1, 1).getValues()[0][0];
+  } else {
+    value = sheet.getRange(row_number, column_number, 1, 1).getValues()[0][0];
+  }
+  if(value == null || value == "") value = -1;
+  return(value);
+}
+
+function getAcceptProjects(need_projects_name, data_p)
+{
+  if(need_projects_name == null) return (null);
+  var arr = [];
+  for each(var need_project_name in need_projects_name){
+    for each(var project in data_p.projects){
+      if(project.is_deleted == 1) continue;
+      if(arr.length > 0){
+        if(project.name.toUpperCase() == need_project_name.toUpperCase()){
+          arr.push(project.id);
+        } else {
+          if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
+          if(checkAcceptProjectsId(arr, project.id)) continue;
+          arr.push(project.id);
+        }
+      } else {
+        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
+        arr.push(project.id);
+      }
+    }
+  }
+  return (arr);
+}
+function getNewDate(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  return (value);
+}
+function getDate(value)
+{
+  var moment = Moment.moment(value);
+    var new_value = "";
+    if(moment != null && value != null)
+    {
+      new_value = moment.toDate();
+    }
+  return(new_value);
+}
+function getWeekNumber(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = getNumberString(Utilities.formatDate(date, "GMT", "w"));
+  return (Number(value));
+}
+function getYear(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = date.getFullYear();
+  //value = getNumberString(Utilities.formatDate(value, "GMT", "y"));
+  return (Number(value));
+}
+function getDayMonth(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = getNumberString(Utilities.formatDate(date, "GMT", "d"));
+  return (Number(value));
+}
+function getWeekDay(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  var day = date.getDay();
+  if(day == 0) day = 7;
+  return (Number(day));
+}
+function getMonth(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = date.getMonth() + 1;
+  //value = getNumberString(Utilities.formatDate(date, "GMT", "m"));
+  return (Number(value));
+}
+function getDatePost(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = Utilities.formatDate(date, "GMT", 'yyyy-MM-dd\'T\'HH:mm').toString();
+  return (value);
+}
+function getProject(arr, need_id)
+{
+  var obj = null;
+  if(arr == null) return(obj);
+
+  for each(var row in arr){
+    if(row.id == need_id) {
+      obj = row;
+      break;
+    }
+  }
+
+  return(obj);
+}
+function checkUrlfetch(spreadsheetId, is_start, config)
+{
+  var tmp_var5 = getParamValue(config[0][0], spreadsheetId, config[0][1]);
+  tmp_var5 = Number(tmp_var5);
+  if(tmp_var5 < 0) tmp_var5 = 0;
+  var tmp_var6 = getParamValue(config[1][0], spreadsheetId, config[1][1]);
+  tmp_var6 = Number(tmp_var6);
+  //urlfetch
+  var percent = tmp_var5 /  tmp_var6 * 100;
+  //
+  var now = new Date();
+  var now_day = now.getDay();
+  var urlfetch_date = getDate(getParamValue(19, spreadsheetId));
+  var urlfetch_date_day = urlfetch_date.getDay();
+  //
+  if(percent > 90 && now_day == urlfetch_date_day) return(false);
+  if(is_start) return(true);
+  setParamConfig("urlfetch", tmp_var5 + 1, config[0][0], spreadsheetId);
+  setParamConfig("urlfetch_date", now, config[2][0], spreadsheetId);
+  return(true);
+}
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+function getDateNextWeek(date)
+{
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  
+  var now_day = getWeekDay(date);
+  var div = 8 - now_day;
+  date = getDate(date);
+  //
+  var next_week = new Date(date.getTime() + div * MILLIS_PER_DAY);
+  return (next_week);
+  
+}
+function createDayOfWeek(day, day_max, p, date)
+{
+  var obj = new Object();
+  
+  obj.day = Number(day);
+  obj.day_max = day_max;
+  obj.day_count = 0;
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  var week_date = getWeekDay(date);
+  if(day < week_date){
+    obj.date = new Date(date.getTime() - (week_date - day) * MILLIS_PER_DAY);
+  } else {
+    obj.date = new Date(date.getTime() + (day - week_date) * MILLIS_PER_DAY);
+  }
+  obj.date = getDate(obj.date);
+  if(p != null){
+    obj.count_p1 = 0;
+    obj.max_p1 = p[0];
+    obj.count_p2 = 0;
+    obj.max_p2 = p[1];
+    obj.count_p3 = 0;
+    obj.max_p3 = p[2];
+    obj.count_p4 = 0;
+    obj.max_p4 = p[3];
+  } else {
+    obj.count_p1 = 0;
+    obj.max_p1 = 0;
+    obj.count_p2 = 0;
+    obj.max_p2 = 0;
+    obj.count_p3 = 0;
+    obj.max_p3 = 0;
+    obj.count_p4 = 0;
+    obj.max_p4 = 0;
+  }
+  obj.items = [];
+  return (obj);
+}
+
+
+function createEmptyWeek(day_max, p, date)
+{
+  var arr_obj = [];
+  
+  for(var i=0;i<7;i++){
+    var obj = createDayOfWeek(i+1, day_max, p, date);
+    arr_obj.push(obj);
+  }
+  
+  return (arr_obj);
+}
+function updateTasks(resource_type, type, token, items, spreadsheetId, config)
+{
+  var apiURL = "https://todoist.com/api/v7/sync";
+  var commands = getCommands(items, type, 100);
+  var payload = getPayloadUpdateV7(resource_type, type, token, items, commands);
+  var options = getOptions(payload, "post");
+  var content = getResponseContent(apiURL, options, spreadsheetId, config);
+
+  return(content);
+}
+function getSingleLabel(token, id, spreadsheetId)
+{
+  var apiURL = "https://todoist.com/api/v7/labels/get";
+  var item = null;
+  var data = getResource(apiURL, token, 7, '["label"]', null, id, "label_id", spreadsheetId);
+  if(data != null) item = data.label;
+  return(item);
+}
+function getMaxCountRows(sheet)
+{
+  var count = 0;
+  //var sheet_data = sheet.getDataRange().getValues();
+  var sheet_values = sheet.getDataRange().getValues();
+  count = sheet_values.length;
+  /*for(var i = sheet_data.length-1 ; i >=0 ; i--){
+    if (sheet_data[i][0] != null && sheet_data[i][0] != ''){
+      count=i+1;
+      break;
+    }
+  }*/
+  
+  return(count);
+}
+function insertItemArrayIndexes(item)
+{
+  var arr = [];
+  arr.push(
+    item.date_added, //1
+    item.due_date_utc, //2
+    item.date_completed, //3
+    item.year_completed, //4
+    item.month_completed, //5
+    item.day_completed, //6
+    item.day_of_week_completed, //7
+    item.all_day, //8
+    item.content, //9
+    item.priority, //10
+    item.responsible_uid, //11
+    item.user_name, //12
+    item.completed, //13
+    item.project_id, //14
+    item.project_name, //15
+    "", //16
+    item.id, //17
+    item.now, //18
+    "", //19
+    item.id_modified, //19
+    item.now_time, //20
+    item.year_added, //21
+    item.month_added, //22
+    item.year_due, //23
+    item.month_due, //24
+    1, //25
+    item.labels //26
+  );
+  
+  return (arr);
+}
+function maxMinByName(arr, name)
+{
+  var value = [arr[0][name], 0, arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] > value[0]) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+    if(item[name] < value[2]) {
+      value[2] = item[name];
+      value[3] = i;
+    }
+  }
+  return(value);
+}
+function maxByName(arr, name)
+{
+  var value = [arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] > value) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+  }
+  return(value);
+}
+function minByName(arr, name)
+{
+  var value = [arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] < value) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+  }
+  return(value);
+}
+function arrSortAscItemsByName(arr, name, type)
+{
+  var max_min_date =  maxMinByName(arr, name);
+  var max_date =  max_min_date[0];
+  var max_date_index =  max_min_date[1];
+  var min_date = max_min_date[2];
+  var min_date_index =  max_min_date[3];
+  //
+  if(type == null || type == "") type = "date";
+  var tmp_arr = [];
+  for (var i = 0; i < arr.length; i++){
+    tmp_arr.push(arr[i]);
+    for(var j = 0; j < tmp_arr.length; j++){
+      if(tmp_arr.length > 1){
+        var new_item = tmp_arr[tmp_arr.length - 1];
+        if(type == "date"){
+          if(new_item[name].getTime() < tmp_arr[j][name].getTime()){
+            var tmp_var = tmp_arr[j];
+            tmp_arr[j] = new_item;
+            tmp_arr[tmp_arr.length - 1] = tmp_var;
+          }
+        } else {
+          if(new_item[name] < tmp_arr[j][name]){
+            var tmp_var = tmp_arr[j];
+            tmp_arr[j] = new_item;
+            tmp_arr[tmp_arr.length - 1] = tmp_var;
+          }
+        }
+      }
+    }
+  }
+  var obj = new Object();
+  obj.arr = tmp_arr;
+  obj.max_min_date = max_min_date;
+  return (obj);
+}
+function getString(value)
+{
+  var str = "";
+  if(value == null) return (str);
+  str = "" + value;
+  return (str);
 }
