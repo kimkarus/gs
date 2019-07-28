@@ -1,5 +1,5 @@
 function myFunction() {
-  var spreadsheetId = "1fdVuNRwco5FBUHRdTJF0R7_fa-BhU4L6AFCp5F8jDCw";
+  var spreadsheetId = "your id";
   //
   var need_projects_name_for_home = kts.getProjectsFor(2, spreadsheetId);
   var need_projects_name_for_work = kts.getProjectsFor(3, spreadsheetId);
@@ -10,9 +10,24 @@ function myFunction() {
   if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
   var obj_data = kts.getData(token, 7, spreadsheetId, conifig_param_url_fetch);
   //
-  grabTasks(obj_data, need_projects_name_for_home, spreadsheetId, token, false, default_name, "home", false, conifig_param_url_fetch);
+  var operation_status = Number(kts.getParamValue(15, spreadsheetId));
+  if(operation_status == 0){
+    grabTasks(obj_data, need_projects_name_for_home, spreadsheetId, token, false, default_name, "home", false, conifig_param_url_fetch);
+    setNextOperationStatus(spreadsheetId, operation_status);
+    return;
+  }
   //
-  grabTasks(obj_data, need_projects_name_for_work, spreadsheetId, token, false, default_name, "work", false, conifig_param_url_fetch);
+  if(operation_status == 1){
+    grabTasks(obj_data, need_projects_name_for_work, spreadsheetId, token, false, default_name, "work", false, conifig_param_url_fetch);
+    setNextOperationStatus(spreadsheetId, operation_status);
+    return;
+  }
+}
+function setNextOperationStatus(spreadsheetId, operation_status)
+{
+  var next_opertaion_status = operation_status + 1;
+  if(next_opertaion_status > 1) next_opertaion_status = 0;
+  kts.setParamConfig("operation_status", next_opertaion_status, 15, spreadsheetId);
 }
 function initializeSheets(spreadsheetId)
 {
@@ -80,6 +95,11 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
     if(item.priority == 3) arr_days[index].count_p3++;
     if(item.priority == 4) arr_days[index].count_p4++;
   }
+  var isP4 = kts.getParamValue(6, spreadsheetId, 3);
+  var isP3 = kts.getParamValue(6, spreadsheetId, 4);
+  var isP2 = kts.getParamValue(6, spreadsheetId, 5);
+  var isP1 = kts.getParamValue(6, spreadsheetId, 6);
+
   //
   for(var i = 0; i < arr_days.length; i++){
       for(var j = arr_days[i].items.length - 1; j >= 0; j--){
@@ -91,16 +111,16 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
           need_change = true;
         }
         if(arr_days[i].items[j].priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1 && !need_change){
-          need_change = true;
+          if(isP1 > 0) need_change = true;
         }
         if(arr_days[i].items[j].priority == 2 && arr_days[i].count_p2 > arr_days[i].max_p2 && !need_change){
-          need_change = true;
+          if(isP2 > 0) need_change = true;
         }
         if(arr_days[i].items[j].priority == 3 && arr_days[i].count_p3 > arr_days[i].max_p3 && !need_change){
-          need_change = true;
+          if(isP3 > 0) need_change = true;
         }
         if(arr_days[i].items[j].priority == 4 && arr_days[i].count_p4 > arr_days[i].max_p4 && !need_change){
-          need_change = true;
+          if(isP4 > 0) need_change = true;
         }
         if(need_change){
           if(arr_days[i].items[j].priority == 1) arr_days[i].count_p1--;
@@ -126,16 +146,16 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
       if(arr_days[j].day_count < arr_days[j].day_max){
         
         if(arr_change[i].priority == 1 && (arr_days[j].count_p1 + 1) <= arr_days[j].max_p1 && !need_change){
-          need_change = true;
+          if(isP1 > 0) need_change = true;
         }
         if(arr_change[i].priority == 2 && (arr_days[j].count_p2 + 1) <= arr_days[j].max_p2 && !need_change){
-          need_change = true;           
+          if(isP2 > 0) need_change = true;           
         }
         if(arr_change[i].priority == 3 && (arr_days[j].count_p3 + 1) <= arr_days[j].max_p3 && !need_change){
-          need_change = true;
+          if(isP3 > 0) need_change = true;
         }
         if(arr_change[i].priority == 4 && (arr_days[j].count_p4 + 1) <= arr_days[j].max_p4 && !need_change){
-          need_change = true;
+          if(isP4 > 0) need_change = true;
         }
         if(need_change){
           if(arr_change[i].priority == 1) arr_days[j].count_p1++;
@@ -154,10 +174,10 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
       for(var j = 0; j < arr_days.length; j++){
         if(arr_days[j].day_count < arr_days[j].day_max){
           if(arr_change[i].priority == 4 && (arr_days[j].day_count + 1) <= arr_days[j].day_max && !need_change){
-            need_change = true;
+            //need_change = true;
           }
           if(arr_change[i].priority == 3 && (arr_days[j].day_count + 1) <= arr_days[j].day_max && !need_change){
-            need_change = true;
+            //need_change = true;
           }
           if(need_change){
             if(arr_change[i].priority == 3) arr_days[j].count_p3++;
