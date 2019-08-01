@@ -8,6 +8,7 @@ function myFunction(sId) {
   initializeSheets(spreadsheetId);
   //
   var operation_status = Number(kts.getParamValue(15, spreadsheetId));
+  if(operation_status < 0) operation_status = 0;
   //fill year, month, day, day of week
   if(operation_status == 3)
   {
