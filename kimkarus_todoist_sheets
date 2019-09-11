@@ -47,7 +47,7 @@ function getOptions(payload, method, commands)
 
   return(options);
 }
-function getPayloadV7(resource_type, token, ipc, id, field_name)
+function getPayloadV7(resource_type, token, ipc, id, field_name) 
 {
   var payload = null;
   if(ipc != null){
