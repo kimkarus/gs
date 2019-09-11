@@ -36,7 +36,7 @@ function initializeSheets(spreadsheetId)
   kts.checkExistenceSheets(ss, "config");
 }
 function grabTasks(obj_data, need_projects_name, spreadsheetId, token, completed_tasks, default_name, type, is_refreshing, conifig_param_url_fetch) {
-  if(obj_data == null) return;
+  if(obj_data == null) return; 
   var filtered_tasks = [];
   var accept_project_entries = kts.getAcceptProjects(need_projects_name, obj_data.data_p);
    
