@@ -1,5 +1,5 @@
 function myFunction() {
-  var spreadsheetId = "your id";
+  var spreadsheetId = "1fdVuNRwco5FBUHRdTJF0R7_fa-BhU4L6AFCp5F8jDCw";
   //
   var need_projects_name_for_home = kts.getProjectsFor(2, spreadsheetId);
   var need_projects_name_for_work = kts.getProjectsFor(3, spreadsheetId);
@@ -8,7 +8,16 @@ function myFunction() {
   initializeSheets(spreadsheetId);
   var conifig_param_url_fetch = [[17, 2],[18, 2], [19, 2]];
   if(!kts.checkUrlfetch(spreadsheetId, true, conifig_param_url_fetch)) return;
+  var now = new Date();
+  var date_next_week = kts.getDate(kts.getDateNextWeek(now));
   var obj_data = kts.getData(token, 7, spreadsheetId, conifig_param_url_fetch);
+  if(obj_data != null){
+    if(obj_data.data != null){
+      if(obj_data.data.items != null){
+        obj_data.data.items = getItemsUntil(obj_data.data.items, date_next_week);
+      }
+    }
+  }
   //
   var operation_status = Number(kts.getParamValue(15, spreadsheetId));
   if(operation_status < 0) operation_status = 0;
@@ -23,6 +32,23 @@ function myFunction() {
     setNextOperationStatus(spreadsheetId, operation_status);
     return;
   }
+}
+function getItemsUntil(items, date)
+{
+  var date_max = kts.getDate(date);
+  for (i=0; i < items.length; ++i){
+    //numbers.splice(i, 1); // Remove even numbers
+    if(items[i].due != null){
+      var item_due_date = kts.getDate(items[i].due.date);
+      if(item_due_date > date_max){
+        items.splice(i, 1);
+      }
+    } 
+    if(items[i].due == null || items[i].due == ""){
+      items.splice(i, 1);
+    }
+  }
+  return (items);
 }
 function setNextOperationStatus(spreadsheetId, operation_status)
 {
@@ -68,7 +94,9 @@ function processTasks(arr, check_exists, spreadsheetId, token, type, conifig_par
 }
 function moveTasks(arr, token, spreadsheetId, type, conifig_param_url_fetch)
 {
-  kts.updateTasks('["items"]', "item_update", token, arr, spreadsheetId, conifig_param_url_fetch);
+  if(arr.length > 0){
+    kts.updateTasks('["items"]', "item_update", token, arr, spreadsheetId, conifig_param_url_fetch);
+  }
 }
 function sortTasks(arr, arr_days, type, spreadsheetId)
 {
@@ -99,38 +127,46 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
     if(item.priority == 3) arr_days[index].count_p3++;
     if(item.priority == 4) arr_days[index].count_p4++;
   }
-  var isP1 = kts.getParamValue(6, spreadsheetId, 3);
-  var isP2 = kts.getParamValue(6, spreadsheetId, 4);
-  var isP3 = kts.getParamValue(6, spreadsheetId, 5);
-  var isP4 = kts.getParamValue(6, spreadsheetId, 6);
-  
+  var enables_p = [];
+  enables_p.push(0, 
+                 kts.getParamValue(6, spreadsheetId, 3), 
+                 kts.getParamValue(6, spreadsheetId, 4), 
+                 kts.getParamValue(6, spreadsheetId, 5), 
+                 kts.getParamValue(6, spreadsheetId, 6)
+                );
   
   //
   for(var i = 0; i < arr_days.length; i++){
       for(var j = arr_days[i].items.length - 1; j >= 0; j--){
-        var need_change = false;
+        var need_change_must = false;
         var obj_marking = null;
         if(arr_days[i].day < now_day - count_previous_days){
-          need_change = true;
+          need_change_must = true;
         }
         
         //obj_marking = itemsMarking(arr_change, arr_days, i, j, arr_days[i].items[j].priority, 0, type, need_change);
-        
-        if(arr_days[i].items[j].priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1){
-          obj_marking = itemsMarking(arr_change, arr_days, i, j, arr_days[i].items[j].priority, isP1, type, true);
+        var priority = arr_days[i].items[j].priority;
+        var enable_p = enables_p[priority];
+        if(priority == 1 && arr_days[i].count_p1 > arr_days[i].max_p1){
+          obj_marking = itemsMarking(arr_change, arr_days, i, j, priority, enable_p, type, true, need_change_must);
           if(obj_marking != null) j = obj_marking.j;
         }
-        if(arr_days[i].items[j].priority == 2 && arr_days[i].count_p2 > arr_days[i].max_p2){
-          obj_marking = itemsMarking(arr_change, arr_days, i, j, arr_days[i].items[j].priority, isP2, type, true);
+        if(priority == 2 && arr_days[i].count_p2 > arr_days[i].max_p2){
+          obj_marking = itemsMarking(arr_change, arr_days, i, j, priority, enable_p, type, true, need_change_must);
           if(obj_marking != null) j = obj_marking.j;
         }
-        if(arr_days[i].items[j].priority == 3 && arr_days[i].count_p3 > arr_days[i].max_p3){
-          obj_marking = itemsMarking(arr_change, arr_days, i, j, arr_days[i].items[j].priority, isP3, type, true);
+        if(priority == 3 && arr_days[i].count_p3 > arr_days[i].max_p3){
+          obj_marking = itemsMarking(arr_change, arr_days, i, j, priority, enable_p, type, true, need_change_must);
           if(obj_marking != null) j = obj_marking.j;
         }
-        if(arr_days[i].items[j].priority == 4 && arr_days[i].count_p4 > arr_days[i].max_p4){
-          obj_marking = itemsMarking(arr_change, arr_days, i, j, arr_days[i].items[j].priority, isP4, type, true);
+        if(priority == 4 && arr_days[i].count_p4 > arr_days[i].max_p4){
+          obj_marking = itemsMarking(arr_change, arr_days, i, j, priority, enable_p, type, true, need_change_must);
           if(obj_marking != null) j = obj_marking.j;
+        }
+        if(obj_marking == null){
+          if(need_change_must){
+            obj_marking = itemsMarking(arr_change, arr_days, i, j, priority, enable_p, type, true, need_change_must);
+          }
         }
         //
         if(obj_marking != null){
@@ -147,6 +183,8 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
     var need_change = false;
     var obj_changing = null;
     arr_change[i].due_date_utc = date_next_week;
+    var priority =  arr_change[i].priority;
+    var enable_p = enables_p[priority];
     //
     if(arr_change[i].day_of_week_due  < now_day - count_previous_days) continue;
     //if(type == "WORK" && arr_change[i].day_of_week_due >= 6 && !need_change) continue;
@@ -157,16 +195,16 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
         //obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, 0);
         
         if(arr_change[i].priority == 1 && (arr_days[j].count_p1 + 1) <= arr_days[j].max_p1){
-          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, isP1);
+          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, enable_p);
         }
         if(arr_change[i].priority == 2 && (arr_days[j].count_p2 + 1) <= arr_days[j].max_p2){
-          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, isP2);         
+          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, enable_p);         
         }
         if(arr_change[i].priority == 3 && (arr_days[j].count_p3 + 1) <= arr_days[j].max_p3){
-          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, isP3);
+          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, enable_p);
         }
         if(arr_change[i].priority == 4 && (arr_days[j].count_p4 + 1) <= arr_days[j].max_p4){
-          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, isP4);
+          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, enable_p);
         }
         if(obj_changing != null){
           arr_days = obj_changing.arr_days;
@@ -185,10 +223,10 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
         //obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, 0);
         
         if(arr_change[i].priority == 4 && (arr_days[j].day_count + 1) <= arr_days[j].day_max){
-          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, isP4);
+          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, enable_p);
         }
         if(arr_change[i].priority == 3 && (arr_days[j].day_count + 1) <= arr_days[j].day_max){
-          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, isP3);
+          obj_changing = itemsChanging(arr_change, arr_days, j, i, arr_change[i].priority, enable_p);
         }
         if(obj_changing != null){
           arr_days = obj_changing.arr_days;
@@ -204,24 +242,21 @@ function sortTasks(arr, arr_days, type, spreadsheetId)
   //
   return (arr_change);
 }
-function itemsMarking(arr_change, arr_days, index_days, index_items, p, is_change, type, need_change)
+function itemsMarking(arr_change, arr_days, index_days, index_items, p, is_change, type, need_change, need_change_must)
 {
   var obj = new Object();
   //
   obj.need_change = false;
   if(!need_change) obj.need_change = need_change;
   if(is_change > 0){
-    if(p == 1) arr_days[index_days].count_p1--;
-    if(p == 2) arr_days[index_days].count_p2--;
-    if(p == 3) arr_days[index_days].count_p3--;
-    if(p == 4) arr_days[index_days].count_p4--;
+    correctCountP(arr_days, p, index_days, 0);
     arr_days[index_days].day_count--;
     arr_change.push(arr_days[index_days].items[index_items]);
     arr_days[index_days].items.splice(index_items, 1);
     index_items = arr_days[index_days].items.length - 1;
     obj.need_change = true;
   }
-  if(type == "WORK" && arr_days[index_days].day >= 6 && !obj.need_change){
+  if((type == "WORK" && arr_days[index_days].day >= 6 && !obj.need_change) || need_change_must){
     obj.need_change = true;
   }
   //
@@ -231,16 +266,30 @@ function itemsMarking(arr_change, arr_days, index_days, index_items, p, is_chang
   obj.i = index_days;
   return (obj);
 }
+function correctCountP(arr_days, p, index_days, type_operation)
+{
+  if(type_operation == 0){
+    if(p == 1) arr_days[index_days].count_p1--;
+    if(p == 2) arr_days[index_days].count_p2--;
+    if(p == 3) arr_days[index_days].count_p3--;
+    if(p == 4) arr_days[index_days].count_p4--;
+  }
+  if(type_operation == 1){
+    if(p == 1) arr_days[index_days].count_p1++;
+    if(p == 2) arr_days[index_days].count_p2++;
+    if(p == 3) arr_days[index_days].count_p3++;
+    if(p == 4) arr_days[index_days].count_p4++;
+  }
+  
+  return (arr_days);
+}
 function itemsChanging(arr_change, arr_days, index_days, index_items, p, is_change)
 {
   var obj = new Object();
   //
   obj.need_change = false;
   if(is_change > 0){
-    if(p == 1) arr_days[index_days].count_p1++;
-    if(p == 2) arr_days[index_days].count_p2++;
-    if(p == 3) arr_days[index_days].count_p3++;
-    if(p == 4) arr_days[index_days].count_p4++;
+    correctCountP(arr_days, p, index_days, 1);
     arr_days[index_days].day_count++;
     arr_change[index_items].due_date_utc = arr_days[index_days].date;
     obj.need_change = true;
