@@ -1,9 +1,11 @@
 function myFunction(sId) {
   var spreadsheetId = sId;
+  //spreadsheetId = "1odWNhpUrspjuX-n6CMIQRHBGR8EwKn2_gKlsBG6mMb4";
   //
   var need_projects_name = kts.getProjectsFor(10, spreadsheetId);
   var default_name = kts.getParamValue(11, spreadsheetId).toString();
   var token = kts.getParamValue(9, spreadsheetId).toString();
+  var tokens = null;
   var config_param_url_fetch = [[6, 2],[7, 2], [8, 2]];
   initializeSheets(spreadsheetId);
   //
@@ -25,12 +27,25 @@ function myFunction(sId) {
   //
   var tmp_var2 = kts.getParamValue(2, spreadsheetId);
   if(tmp_var2 > 0 && tmp_var2 < count_c) ipc_start = tmp_var2;
+  if(tmp_var2 + 1 >= count_c){
+    kts.setParamConfig("completed_tasks_ipc", 0, 2, spreadsheetId);
+    tmp_var2 = 0;
+    ipc_start = 0;
+  }
   //
   var tmp_var4 = kts.getParamValue(4, spreadsheetId);
+  if (tmp_var4.toString() == "#NUM!") tmp_var4 = 1;
   var tmp_var5 = kts.getParamValue(5, spreadsheetId);
   var tmp_var12 = kts.getParamValue(12, spreadsheetId);
   var tmp_var13 = kts.getParamValue(13, spreadsheetId);
   var tmp_var14 = kts.getParamValue(14, spreadsheetId);
+  var tmp_var16 = kts.getParamValue(16, spreadsheetId);
+  var tmp_var17 = kts.getParamValue(17, spreadsheetId);
+  if(tmp_var16 > 0){
+    tokens = kts.getTokens(spreadsheetId);
+    tmp_var17 = tmp_var17 + 1;
+    if(tmp_var17 >= tokens.length) tmp_var17 = 0;
+  }
   if(tmp_var12 == 0 || tmp_var12 < 0) tmp_var12 = false;
   if(tmp_var12 == 1) tmp_var12 = true;
   if(tmp_var13 == 0 || tmp_var13 < 0) tmp_var13 = false;
@@ -53,26 +68,52 @@ function myFunction(sId) {
     grabTasks(obj_data, need_projects_name, spreadsheetId, token, false, default_name, "Work", false, config_param_url_fetch, operation_status);
     kts.setParamConfig("refreshed", Math.floor(tmp_var2 / tmp_var4), 4, spreadsheetId);
     //
-    obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, config_param_url_fetch, ipc_start);
-    ipc_start++;
-    grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, "Work", false, config_param_url_fetch, operation_status);
-    kts.setParamConfig("completed_tasks_ipc", ipc_start, 2, spreadsheetId);
+    if(tmp_var16 > 0){
+      for(var i = tmp_var17; i < tokens.length; i++){
+        goCompletedForToken(obj_data, tokens[i], spreadsheetId, config_param_url_fetch, ipc_start, need_projects_name, default_name, operation_status, "Work");
+        kts.setParamConfig("active_token", i, 16, spreadsheetId);
+      }
+    }
+    else {
+      goCompletedForToken(obj_data, token, spreadsheetId, config_param_url_fetch, ipc_start, need_projects_name, default_name, operation_status, "Work");
+    }
     //
-    obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, config_param_url_fetch, 1);
-    grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, "Work", false, config_param_url_fetch, operation_status);
-  }
-  //
-  var count_ipc_index = 0;
-  for(var ipc = ipc_start; ipc < count_c;  ipc++){
-    if(count_ipc_index >= tmp_var14) break;
-    obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, config_param_url_fetch, ipc);
-    kts.setParamConfig("completed_tasks_ipc", ipc, 2, spreadsheetId);
-    if(obj_data.data==null) break;
-    if(tmp_var13) tmp_var12 = false;
-    grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, "Work", tmp_var12, config_param_url_fetch);
-    count_ipc_index++;
+  } else {
+    //
+    if(tmp_var16 > 0){
+      for(var i = tmp_var17; i < tokens.length; i++){
+        goOrdinaryCompletedForToken(ipc_start, count_c, tmp_var14, obj_data, tokens[i], spreadsheetId, config_param_url_fetch, tmp_var13, tmp_var12, need_projects_name, default_name, "Work");
+        kts.setParamConfig("active_token", i, 2, spreadsheetId);
+      }
+    } else {
+      goOrdinaryCompletedForToken(ipc_start, count_c, tmp_var14, obj_data, token, spreadsheetId, config_param_url_fetch, tmp_var13, tmp_var12, need_projects_name, default_name, "Work");
+    }
   }
 
+}
+function goOrdinaryCompletedForToken(ipc_start, count_c, tmp_var14, obj_data, token, spreadsheetId, config_param_url_fetch, tmp_var13, tmp_var12, need_projects_name, default_name, sheet_name)
+{
+  var count_ipc_index = 0;
+    for(var ipc = ipc_start; ipc < count_c;  ipc++){
+      if(count_ipc_index >= tmp_var14) break;
+      obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, config_param_url_fetch, ipc);
+      kts.setParamConfig("completed_tasks_ipc", ipc, 2, spreadsheetId);
+      if(obj_data.data==null) break;
+      if(tmp_var13) tmp_var12 = false;
+      grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, sheet_name, tmp_var12, config_param_url_fetch);
+      count_ipc_index++;
+    }
+}
+function goCompletedForToken(obj_data, token, spreadsheetId, config_param_url_fetch, ipc_start, need_projects_name, default_name, operation_status, sheet_name)
+{
+  obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, config_param_url_fetch, ipc_start);
+    
+  ipc_start++;
+  grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, sheet_name, false, config_param_url_fetch, operation_status);
+  kts.setParamConfig("completed_tasks_ipc", ipc_start, 2, spreadsheetId);
+
+  obj_data.data = kts.getDataCompleted(token, 7, spreadsheetId, config_param_url_fetch, 1);
+  grabTasks(obj_data, need_projects_name, spreadsheetId, token, true, default_name, sheet_name, false, config_param_url_fetch, operation_status);
 }
 function setNextOperationStatus(spreadsheetId, operation_status)
 {
@@ -95,10 +136,11 @@ function grabTasks(obj_data, need_projects_name, spreadsheetId, token, completed
   var accept_project_entries = kts.getAcceptProjects(need_projects_name, obj_data.data_p);
   var deleted_tasks = [];
   
-  for each(var row in obj_data.data.items) {
+  for(var i in obj_data.data.items) {
+    var row = obj_data.data.items[i];
     var item = kts.getTaskItem(row, completed_tasks, token, spreadsheetId, is_refreshing, obj_data.data_p, obj_data.data_l, obj_data.data_c, default_name, conifig_param_url_fetch);
     if(item == null) continue;
-    if (item.is_deleted == 1) {
+    if (item.is_deleted) {
       deleted_tasks = kts.insertItemArray(deleted_tasks, item); 
       continue;
     }
@@ -283,7 +325,8 @@ function modifyItem(item, sheet, row_number, spreadsheetId, token, sheet_values)
   var index_col_start = 26;
   if(labels != null && labels.length > 0){
     for (var i = 0; i < labels.length; i++){
-      var label = labels[i].toString();
+      var label = "" + labels[i];
+      //var label = labels[i].toString();
       //sheet_values[row_number, index_col_start + i] = label;
       sheet.getRange(row_number + 1, index_col_start + i + 1, 1, 1).setValue(label);
     }
@@ -357,7 +400,8 @@ function addNewItem(item, sheet, row_number)
     var count_l = labels.length;
     if(count_l > 0){
       for (var i = 0; i < count_l; i++){
-        var label = labels[i].toString();
+        var label = "" + labels[i];
+        //var label = labels[i].toString();
         sheet.getRange(row_number, index_col_start+i+1, 1, 1).setValue(label);
       }
     }
@@ -367,13 +411,15 @@ function checkItimeId(item_id, sheet_values, count, check_exists)
 {
   var index = -1;
   if(!check_exists) return(index);
-  item_id = item_id.toString();
+  item_id = "" + item_id;
+  //item_id = item_id.toString();
   for(j=0; j < count; j++)
   {
     var sheet_item_id = -1;
     index = -1;
     if(sheet_values[j][16] == null || sheet_values[j][16] == "") continue;
-    sheet_item_id = sheet_values[j][16].toString();
+    sheet_item_id = "" + sheet_values[j][16];
+    //sheet_item_id = sheet_values[j][16].toString();
     if(sheet_item_id == item_id)
     {
       index = j;
