@@ -1,3 +1,4 @@
+//KTS
 function getResource(api_url, token, api_version, resource_type, ipc, id, field_name, spreadsheetId, config){
   //
   if(api_url == "" || api_url == null) api_url = getApiUrlSync();
@@ -27,89 +28,661 @@ function getData(token, api_version, spreadsheetId, config)
   obj.data = getResource("", token, api_version, '["items"]', null, null, null, spreadsheetId, config);
   return(obj);
 }
-function getDataCompleted(token, api_version, spreadsheetId, config, ipc)
+function checkExistenceSheets(ss, sheet_name)
 {
-  var api_url = getApiUrlGetCompleted();
-  var data = getResource(api_url, token, api_version, '["items"]', ipc, null, null, spreadsheetId, config);
-  return(data);
+  if (ss.getSheetByName(sheet_name) == null){
+    ss.insertSheet(sheet_name);
+  }
 }
-function getOptions(payload, method, commands)
+function getUserName(arr, need_id, default_name)
 {
-  if(method == null || method == "") method = "get";
-  var options = null;
+  var name = default_name;
+  if(arr == null) return(name);
+  if(need_id == 0 || need_id == null || need_id == "") return(name);
 
-  options = {
-    method : method,
-    payload : payload,
-    contentType: 'application/x-www-form-urlencoded',
-    muteHttpExceptions : true
-  };
-
-  return(options);
-}
-function getPayloadV7(resource_type, token, ipc, id, field_name)
-{
-  var payload = null;
-  if(ipc != null){
-    payload =
-      {
-        "token" : token,
-        "sync_token": '*',
-        "resource_types" : resource_type,
-        "offset" : ipc.toString()
-        
-      };
-  } else {
-    if(id != null){
-      if(field_name == "item_id")
-      {
-        payload =
-          {
-            "token" : token,
-            "item_id" : id.toString()
-          };
-      }
-      if(field_name == "label_id")
-      {
-        payload =
-          {
-            "token" : token,
-            "label_id" : id.toString()
-          };
-      }
-      
-    } else {
-      payload =
-        {
-          "token" : token,
-          "sync_token": '*',
-          "resource_types" : resource_type
-        };
+  for(var i in arr){
+    var row = arr[i];
+    if(row.id == need_id) {
+      name = row.full_name;
+      break;
     }
   }
-  
-  return(payload);
-}
-function getPayloadUpdateV7(resource_type, type, token, items, commands)
-{
-  var payload = null;
 
-  payload =
-    {
-      "token" : token,
-      "sync_token" : '*',
-      "resource_types" : resource_type,
-      "commands" : commands
-    };
-  
-  return(payload);
+  return(name);
 }
+function updateTasks(resource_type, type, token, items, spreadsheetId, config)
+{
+  var apiURL = getApiUrlSync();
+  var commands = getCommands(items, type, 100);
+  var payload = getPayloadUpdateV7(resource_type, type, token, items, commands);
+  var options = getOptions(payload, "post");
+  var content = getResponseContent(apiURL, options, spreadsheetId, config);
+
+  return(content);
+}
+function insertItemArrayIndexes(item)
+{
+  var arr = [];
+  arr.push(
+    item.date_added, //1
+    item.due_date_utc, //2
+    item.date_completed, //3
+    item.year_completed, //4
+    item.month_completed, //5
+    item.day_completed, //6
+    item.day_of_week_completed, //7
+    item.all_day, //8
+    item.content, //9
+    item.priority, //10
+    item.responsible_uid, //11
+    item.user_name, //12
+    item.completed, //13
+    item.project_id, //14
+    item.project_name, //15
+    "", //16
+    item.id, //17
+    item.now, //18
+    "", //19
+    item.id_modified, //19
+    item.now_time, //20
+    item.year_added, //21
+    item.month_added, //22
+    item.year_due, //23
+    item.month_due, //24
+    1, //25
+    item.labels //26
+  );
+  
+  return (arr);
+}
+//GENERAL
+function arrSortAscItemsByName(arr, name, type)
+{
+  var max_min_date =  maxMinByName(arr, name);
+  var max_date =  max_min_date[0];
+  var max_date_index =  max_min_date[1];
+  var min_date = max_min_date[2];
+  var min_date_index =  max_min_date[3];
+  //
+  if(type == null || type == "") type = "date";
+  var tmp_arr = [];
+  for (var i = 0; i < arr.length; i++){
+    tmp_arr.push(arr[i]);
+    for(var j = 0; j < tmp_arr.length; j++){
+      if(tmp_arr.length > 1){
+        var new_item = tmp_arr[tmp_arr.length - 1];
+        if(type == "date"){
+          if(new_item[name].getTime() < tmp_arr[j][name].getTime()){
+            var tmp_var = tmp_arr[j];
+            tmp_arr[j] = new_item;
+            tmp_arr[tmp_arr.length - 1] = tmp_var;
+          }
+        } else {
+          if(new_item[name] < tmp_arr[j][name]){
+            var tmp_var = tmp_arr[j];
+            tmp_arr[j] = new_item;
+            tmp_arr[tmp_arr.length - 1] = tmp_var;
+          }
+        }
+      }
+    }
+  }
+  var obj = new Object();
+  obj.arr = tmp_arr;
+  obj.max_min_date = max_min_date;
+  return (obj);
+}
+function maxByName(arr, name)
+{
+  var value = [arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] > value) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+  }
+  return(value);
+}
+function minByName(arr, name)
+{
+  var value = [arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] < value) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+  }
+  return(value);
+}
+function maxMinByName(arr, name)
+{
+  var value = [arr[0][name], 0, arr[0][name], 0];
+  for (var i = 1; i < arr.length; i++){
+    var item = arr[i];
+    if(item[name] > value[0]) {
+      value[0] = item[name];
+      value[1] = i;
+    }
+    if(item[name] < value[2]) {
+      value[2] = item[name];
+      value[3] = i;
+    }
+  }
+  return(value);
+}
+
+
+function getString(value)
+{
+  var str = "";
+  if(value == null) return (str);
+  str = "" + value;
+  return (str);
+}
+function getSingleLabel(token, id, spreadsheetId)
+{
+  var apiURL = getApiUrlGet();
+  var item = null;
+  var data = getResource(apiURL, token, 7, '["label"]', null, id, "label_id", spreadsheetId);
+  if(data != null) item = data.label;
+  return(item);
+}
+function getMaxCountRows(sheet)
+{
+  var count = 0;
+  //var sheet_data = sheet.getDataRange().getValues();
+  var sheet_values = sheet.getDataRange().getValues();
+  count = sheet_values.length;
+  /*for(var i = sheet_data.length-1 ; i >=0 ; i--){
+    if (sheet_data[i][0] != null && sheet_data[i][0] != ''){
+      count=i+1;
+      break;
+    }
+  }*/
+  
+  return(count);
+}
+function convertArrStringToNumber(arr)
+{
+  var count = arr.length;
+  for(var i = 0; i< count; i++){
+    arr[i] = getNumberString(arr[i]);
+  }
+  return (arr);
+}
+function getNumberString(str)
+{
+  var tmp = -1;
+  if(str == "") return (0);
+  if(str == "0") return (0);
+  if(str == 0) return (0);
+  if(str == null) return (-1);
+  tmp = Number(str);
+  return(tmp);
+}
+function insertItemArray(arr, item)
+{
+  arr.push(item);
+  
+  return (arr);
+}
+//DATES
+function getNewDate(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  return (value);
+}
+function getDateNextWeek(date)
+{
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  
+  var now_day = getWeekDay(date);
+  var div = 8 - now_day;
+  date = getDate(date);
+  //
+  var next_week = new Date(date.getTime() + div * MILLIS_PER_DAY);
+  return (next_week);
+  
+}
+function createDayOfWeek(day, day_max, p, date)
+{
+  var obj = new Object();
+  
+  obj.day = Number(day);
+  obj.day_max = day_max;
+  obj.day_count = 0;
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  var week_date = getWeekDay(date);
+  if(day < week_date){
+    obj.date = new Date(date.getTime() - (week_date - day) * MILLIS_PER_DAY);
+  } else {
+    obj.date = new Date(date.getTime() + (day - week_date) * MILLIS_PER_DAY);
+  }
+  obj.date = getDate(obj.date);
+  obj.count_p1 = 0;
+  obj.count_p2 = 0;
+  obj.count_p3 = 0;
+  obj.count_p4 = 0;
+  if(p != null){
+    obj.max_p1 = p[0];
+    obj.max_p2 = p[1];
+    obj.max_p3 = p[2];
+    obj.max_p4 = p[3];
+  } else {
+    obj.max_p1 = 0;
+    obj.max_p2 = 0;
+    obj.max_p3 = 0;
+    obj.max_p4 = 0;
+  }
+  obj.items = [];
+  return (obj);
+}
+function createEmptyWeek(day_max, p, date)
+{
+  var arr_obj = [];
+  
+  for(var i=0;i<7;i++){
+    var obj = createDayOfWeek(i+1, day_max, p, date);
+    arr_obj.push(obj);
+  }
+  
+  return (arr_obj);
+}
+function getDatePost(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = Utilities.formatDate(date, "GMT", 'yyyy-MM-dd').toString();
+  //value = Utilities.formatDate(date, "GMT", 'yyyy-MM-dd\'T\'HH:mm').toString();
+  return (value);
+}
+function getDate(value)
+{
+  var moment = Moment.moment(value);
+    var new_value = "";
+    if(moment != null && value != null)
+    {
+      new_value = moment.toDate();
+    }
+  return(new_value);
+}
+function getWeekNumber(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = getNumberString(Utilities.formatDate(date, "GMT", "w"));
+  return (Number(value));
+}
+function getYear(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = date.getFullYear();
+  //value = getNumberString(Utilities.formatDate(value, "GMT", "y"));
+  return (Number(value));
+}
+function getDayMonth(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = getNumberString(Utilities.formatDate(date, "GMT", "d"));
+  return (Number(value));
+}
+function getWeekDay(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  var day = date.getDay();
+  if(day == 0) day = 7;
+  return (Number(day));
+}
+function getMonth(value)
+{
+  if(value == null || value == "") return ("");
+  var date = new Date(value);
+  value = date.getMonth() + 1;
+  //value = getNumberString(Utilities.formatDate(date, "GMT", "m"));
+  return (Number(value));
+}
+function getMaxDay(spreadsheetId, type)
+{
+  var tmp = 1;
+  type = type.toUpperCase();
+  if(type == "HOME") tmp = getParamValue(4, spreadsheetId);
+  if(type == "WORK") tmp = getParamValue(5, spreadsheetId);
+  tmp = getNumberString(tmp);
+  
+  return(tmp);
+}
+function getDates(item, completed_tasks, is_refreshing)
+{
+  var obj = new Object();
+  obj.due_date_utc = null;
+  obj.date_added = null;
+  obj.date_completed = null;
+  var is_date_completed = false;
+  if(!completed_tasks || is_refreshing){
+    obj.date_added = getNewDate(item.date_added);
+    if(item.due != null){
+      obj.due_date_utc = getNewDate(item.due.date);
+    }
+    //
+    if(obj.due_date_utc != null && obj.due_date_utc != ""){
+      obj.year_due = getYear(obj.due_date_utc);
+      obj.month_due = getMonth(obj.due_date_utc);
+      obj.day_due = getDayMonth(obj.due_date_utc);
+      obj.day_of_week_due = getWeekDay(obj.due_date_utc);
+      obj.week_due = getWeekNumber(obj.due_date_utc);
+    }
+    if(obj.date_added != null && obj.date_added != ""){
+      obj.year_added = getYear(obj.date_added);
+      obj.month_added = getMonth(obj.date_adde);
+      obj.week_added = getWeekNumber(obj.date_added);
+    }
+    obj.date_added = getDate(obj.date_added);
+    obj.due_date_utc = getDate(obj.due_date_utc);
+  }
+  //
+  if(completed_tasks){
+    obj.date_completed = getNewDate(item.date_completed);
+    if(obj.date_completed != null && obj.date_completed != ""){
+      obj.year_completed = getYear(obj.date_completed);
+      obj.month_completed = getMonth(obj.date_completed);
+      obj.day_completed = getDayMonth(obj.date_completed);
+      obj.day_of_week_completed = getWeekDay(obj.date_completed);
+      obj.week_completed = getWeekNumber(obj.date_completed);
+    }
+    obj.date_completed = getDate(obj.date_completed);
+  } 
+  obj.now = new Date();
+  obj.now_time = obj.now.getTime();
+  
+  return (obj);
+}
+//PROJECTS
+function getProject(arr, need_id)
+{
+  var obj = null;
+  if(arr == null) return(obj);
+
+  for(var i in arr){
+    var row = arr[i]
+    if(row.id == need_id) {
+      obj = row;
+      break;
+    }
+  }
+
+  return(obj);
+}
+function getAcceptProjects_new(need_projects_name, data_p)
+{
+  if(need_projects_name == null) return (null);
+  //if(data_p.projects == null) return (null);
+  var arr = [];
+  for(var i in need_projects_name){
+    var need_name = "" + need_projects_name[i];
+    need_name = need_name.toUpperCase();
+    var project = getProjectByName(need_name, data_p.projects);
+    if(project != null){
+      var f_checkAcceptProjectsId_parent = checkAcceptProjectsId(arr, project.parent_id);
+      var f_checkAcceptProjectsId = checkAcceptProjectsId(arr, project.id);
+      if(arr.length > 0){
+        if(f_checkAcceptProjectsId){
+          arr.push(""+project.id);
+        }
+        if(!f_checkAcceptProjectsId){
+          arr.push(""+project.id);
+        }
+        
+        //if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
+        //if(checkAcceptProjectsId(arr, project.id)) continue;
+        
+      } else {
+        arr.push(""+project.id);
+      }
+    }
+  }
+  return (arr);
+}
+function getProjectIdByName(name, arr)
+{
+  for(var i=0; i < arr.length; i++){
+    var project = null;
+      try{
+        project = arr[i];
+      } catch (e){
+        console.error('kts function getAcceptProjects() yielded an error: ' + e);
+      }
+    if(project == null) continue;
+    if(project.is_deleted) continue;
+    var project_name = "" + project.name;
+    project_name = project_name.toUpperCase();
+    //var project_name = project.name.toString();
+    var project_name_length = project_name.length;
+    if(project_name_length > 0) if(project_name == name) return(project.id);
+  }
+  return(null);
+}
+function getProjectByName(name, arr)
+{
+  for(var i=0; i < arr.length; i++){
+    var project = null;
+      try{
+        project = arr[i];
+      } catch (e){
+        console.error('kts function getAcceptProjects() yielded an error: ' + e);
+      }
+    if(project == null) continue;
+    if(project.is_deleted) continue;
+    var project_name = "" + project.name;
+    project_name = project_name.toUpperCase();
+    //var project_name = project.name.toString();
+    var project_name_length = project_name.length;
+    if(project_name_length > 0) if(project_name == name) return(project);
+  }
+  return(null);
+}
+function getAcceptProjects(need_projects_name, data_p)
+{
+  if(need_projects_name == null) return (null);
+  //if(data_p.projects == null) return (null);
+  var arr = [];
+  for(var i in need_projects_name){
+    var need_name = "" + need_projects_name[i];
+    need_name = need_name.toUpperCase();
+    for(var i=0; i < data_p.projects.length; i++){
+      var project = null;
+      try{
+        project = data_p.projects[i];
+      } catch (e){
+        console.error('kts function getAcceptProjects() yielded an error: ' + e);
+      }
+      if(project == null) continue;
+      if(project.is_deleted) continue;
+      var project_name = "" + project.name;
+      //var project_name = project.name.toString();
+      var project_name_length = project_name.length;
+      if(arr.length > 0){
+        if(project_name_length > 0) if(project_name.toUpperCase() == need_name){
+          arr.push("" + project.id);
+        } else {
+          if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
+          if(checkAcceptProjectsId(arr, project.id)) continue;
+          arr.push("" + project.id);
+        }
+      } else {
+
+        if(project_name_length > 0) if(project_name.toUpperCase() != need_name) continue;
+        arr.push("" + project.id);
+      }
+    }
+  }
+  return (arr);
+}
+function checkAcceptProjectsId(arr, need_id)
+{
+  if(arr == null) return (false);
+  if(need_id == null) return(true);
+  for(var i in arr) {
+    if(arr[i] == need_id) return (true);
+  }
+  return(false);
+}
+function getProjectsFor(row_number, spreadsheetId)
+{
+  var tmp = getParamValue(row_number, spreadsheetId);
+  if(tmp.toString().length <= 0) return (null);
+  if(tmp.toString().indexOf(",") > -1){
+    var arr = tmp.split(", ");
+  } else {
+    return (null);
+  }
+  return (arr);
+}
+//TASKS
+function getSingleItem(token, id, spreadsheetId, config)
+{
+  var apiURL = getApiUrlGet();
+  var item = null;
+  var data = getResource(apiURL, token, 7, '["item"]', null, id, "item_id", spreadsheetId, config);
+  if(data != null) item = data.item;
+  return(item);
+}
+function getFillForCompleted(item, row)
+{
+  //item.responsible_uid = row.user_id;
+  item.user_id = row.user_id;
+  item.id = row.id;
+  item.project_id = row.project_id;
+  item.date_completed = row.completed_date;
+  
+  return (item);
+}
+function getEmptyItemForTask()
+{
+  var item = new Object();
+  item.completed = 0;
+  item.is_deleted = false;
+  item.labels = [];
+  item.due = new Object();
+  //
+  item.due_date_utc = "";
+  item.year_due = "";
+  item.month_due = "";
+  item.day_due = "";
+  item.day_of_week_due = "";
+  item.week_due = "";
+  //
+  item.date_added = "";
+  item.year_added = "";
+  item.month_added = "";
+  item.week_added = "";
+  //
+  item.date_completed = "";
+  item.year_completed = "";
+  item.month_completed = "";
+  item.day_completed = "";
+  item.day_of_week_completed = "";
+  item.week_completed = "";
+  //
+  item.project_id = "";
+  item.responsible_uid = "";
+  item.all_day = false;
+  item.content = "";
+  item.priority = 1;
+  item.id = "";
+  item.now = "";
+  item.now_item = "";
+  item.user_name = "";
+  item.project_name = "";
+  item.responsible_uid = 0;
+  item.id_modified = -1;
+  
+  return (item);
+}
+function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, config)
+{
+  var item_new = getEmptyItemForTask();
+  var item_refreshed = null;
+  if(item == null || item == "" || item == "0") return (null);
+  if(completed_tasks) item_new = getFillForCompleted(item_new, item);
+  //if(item_new != null) item = item_new;
+  if(is_refreshing) item_refreshed = getSingleItem(token, item.id, spreadsheetId, config);
+  if(item_refreshed != null) item_new = item_refreshed;
+  //
+  var obj_dates = getDates(item, completed_tasks, is_refreshing);
+  //date_completed
+  item_new.due = item.due;
+  item_new.date_completed = obj_dates.date_completed;
+  item_new.year_completed = obj_dates.year_completed;
+  item_new.month_completed = obj_dates.month_completed;
+  item_new.day_completed = obj_dates.day_completed;
+  item_new.day_of_week_completed = obj_dates.day_of_week_completed;
+  item_new.week_completed = obj_dates.week_completed;
+  //date_added 
+  item_new.date_added = obj_dates.date_added;
+  item_new.year_added = obj_dates.year_added;
+  item_new.month_added = obj_dates.month_added;
+  item_new.week_added = obj_dates.week_added;
+  //date_due
+  item_new.due_date_utc = obj_dates.due_date_utc; 
+  item_new.year_due = obj_dates.year_due;
+  item_new.month_due = obj_dates.month_due;
+  item_new.day_due = obj_dates.day_due;
+  item_new.day_of_week_due = obj_dates.day_of_week_due;
+  item_new.week_due = obj_dates.week_due;
+  //now
+  item_new.now = obj_dates.now;
+  item_new.now_time = obj_dates.now_time;
+  //
+  if(item.project_id != null && item.project_id != ""){
+    item_new.project_id = item.project_id;
+    var project = getProject(data_p.projects, item_new.project_id);
+    if(project!=null) item_new.project_name = project.name;
+    //item_new.project_id = item_new.project_id.toString();
+    item_new.project_id = "" + item_new.project_id;
+  }
+  //
+  if(completed_tasks){
+    var obj_content = getContentLabels(item, data_l);
+    item_new.content = obj_content.content;
+    item_new.labels = obj_content.labels;
+    item_new.completed = 1;
+  }
+  if(!completed_tasks || is_refreshing){
+    item_new.labels = getLabelNames(item.labels, data_l, "", token, spreadsheetId);
+    item_new.content = item.content;
+    item_new.all_day = item.all_day;
+    item_new.is_deleted = item.is_deleted;
+    item_new.priority = item.priority;
+    item_new.completed = item.checked;
+    if(item.responsible_uid != null) item_new.responsible_uid = "" + item.responsible_uid;
+    //if(item.responsible_uid != null) item_new.responsible_uid = item.responsible_uid.toString();
+    if(data_c != null) if(data_c.collaborators != null) item_new.user_name = getUserName(data_c.collaborators, item_new.responsible_uid, default_name);
+  }
+  var id = "";
+  try{
+    //id = item.id.toString();
+    id = "" + item.id;
+  } catch (e){
+    console.error('kts function getTaskItem() yielded an error: ' + e);
+  }
+  item_new.id = id;
+  //
+  return (item_new);
+}
+//TODOIST
 function getCommands(items, type, max_count)
 {
   var commands = [];
   if(max_count == null || max_count == "") max_count = 100;
   var count = 0;
-  for each(var item in items){
+  for(var i in items){
+    var item = items[i];
     //var args = [];
     var args = {
       "id": item.id.toString(), 
@@ -185,212 +758,89 @@ function getResponseContent(apiURL, options, spreadsheetId, config)
       content = JSON.parse(response_content_text);
     } catch (e){
       content = null;
+      console.error('kts function getResponseContent() yielded an error: ' + e);
     }
   }
   return(content);
 }
-function checkExistenceSheets(ss, sheet_name)
+function getOptions(payload, method, commands)
 {
-  if (ss.getSheetByName(sheet_name) == null){
-    ss.insertSheet(sheet_name);
-  }
+  if(method == null || method == "") method = "get";
+  var options = null;
+
+  options = {
+    method : method,
+    payload : payload,
+    contentType: 'application/x-www-form-urlencoded',
+    muteHttpExceptions : true
+  };
+
+  return(options);
 }
-function getProjectsFor(row_number, spreadsheetId)
+function getPayloadV7(resource_type, token, ipc, id, field_name)
 {
-  var tmp = getParamValue(row_number, spreadsheetId);
-  if(tmp.toString().length <= 0) return (null);
-  if(tmp.toString().indexOf(",") > -1){
-    var arr = tmp.split(", ");
+  var payload = null;
+  if(ipc != null){
+    payload =
+      {
+        "token" : token,
+        "sync_token": '*',
+        "resource_types" : resource_type,
+        "offset" : ipc.toString()
+        
+      };
   } else {
-    return (null);
+    if(id != null){
+      if(field_name == "item_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "item_id" : "" + id.toString()
+          };
+      }
+      if(field_name == "label_id")
+      {
+        payload =
+          {
+            "token" : token,
+            "label_id" : id.toString()
+          };
+      }
+      
+    } else {
+      payload =
+        {
+          "token" : token,
+          "sync_token": '*',
+          "resource_types" : resource_type
+        };
+    }
   }
-  return (arr);
-}
-function insertItemArray(arr, item)
-{
-  arr.push(item);
   
-  return (arr);
+  return(payload);
 }
-function getTaskItem(item, completed_tasks, token, spreadsheetId, is_refreshing, data_p, data_l, data_c, default_name, config)
+function getPayloadUpdateV7(resource_type, type, token, items, commands)
 {
-  var item_new = getEmptyItemForTask();
-  var item_refreshed = null;
-  if(item == null || item == "") return (null);
-  if(completed_tasks) item_new = getFillForCompleted(item_new, item);
-  //if(item_new != null) item = item_new;
-  if(is_refreshing) item_refreshed = getSingleItem(token, item.id, spreadsheetId, config);
-  if(item_refreshed != null) item_new = item_refreshed;
-  //
-  var obj_dates = getDates(item, completed_tasks, is_refreshing);
-  //date_completed
-  item_new.due = item.due;
-  item_new.date_completed = obj_dates.date_completed;
-  item_new.year_completed = obj_dates.year_completed;
-  item_new.month_completed = obj_dates.month_completed;
-  item_new.day_completed = obj_dates.day_completed;
-  item_new.day_of_week_completed = obj_dates.day_of_week_completed;
-  item_new.week_completed = obj_dates.week_completed;
-  //date_added 
-  item_new.date_added = obj_dates.date_added;
-  item_new.year_added = obj_dates.year_added;
-  item_new.month_added = obj_dates.month_added;
-  item_new.week_added = obj_dates.week_added;
-  //date_due
-  item_new.due_date_utc = obj_dates.due_date_utc; 
-  item_new.year_due = obj_dates.year_due;
-  item_new.month_due = obj_dates.month_due;
-  item_new.day_due = obj_dates.day_due;
-  item_new.day_of_week_due = obj_dates.day_of_week_due;
-  item_new.week_due = obj_dates.week_due;
-  //now
-  item_new.now = obj_dates.now;
-  item_new.now_time = obj_dates.now_time;
-  //
-  if(item.project_id != null && item.project_id != ""){
-    item_new.project_id = item.project_id;
-    var project = getProject(data_p.projects, item_new.project_id);
-    if(project!=null) item_new.project_name = project.name;
-    item_new.project_id = item_new.project_id.toString();
-  }
-  //
-  if(completed_tasks){
-    var obj_content = getContentLabels(item.content);
-    item_new.content = obj_content.content;
-    item_new.labels = obj_content.labels;
-    item_new.completed = 1;
-  }
-  if(!completed_tasks || is_refreshing){
-    item_new.labels = getLabelNames(item.labels, data_l, "", token, spreadsheetId);
-    item_new.content = item.content;
-    item_new.all_day = item.all_day;
-    item_new.is_deleted = item.is_deleted;
-    item_new.priority = item.priority;
-    item_new.completed = item.checked;
-    if(item.responsible_uid != null) item_new.responsible_uid = item.responsible_uid.toString();
-    item_new.user_name = getUserName(data_c.collaborators, item_new.responsible_uid, default_name);
-  }
-  item_new.id = item.id.toString();
-  //
-  return (item_new);
-}
-function getDates(item, completed_tasks, is_refreshing)
-{
-  var obj = new Object();
-  obj.due_date_utc = null;
-  obj.date_added = null;
-  obj.date_completed = null;
-  var is_date_completed = false;
-  if(!completed_tasks || is_refreshing){
-    obj.date_added = getNewDate(item.date_added);
-    if(item.due != null){
-      obj.due_date_utc = getNewDate(item.due.date);
-    }
-    //
-    if(obj.due_date_utc != null && obj.due_date_utc != ""){
-      obj.year_due = getYear(obj.due_date_utc);
-      obj.month_due = getMonth(obj.due_date_utc);
-      obj.day_due = getDayMonth(obj.due_date_utc);
-      obj.day_of_week_due = getWeekDay(obj.due_date_utc);
-      obj.week_due = getWeekNumber(obj.due_date_utc);
-    }
-    if(obj.date_added != null && obj.date_added != ""){
-      obj.year_added = getYear(obj.date_added);
-      obj.month_added = getMonth(obj.date_adde);
-      obj.week_added = getWeekNumber(obj.date_added);
-    }
-    obj.date_added = getDate(obj.date_added);
-    obj.due_date_utc = getDate(obj.due_date_utc);
-  }
-  //
-  if(completed_tasks){
-    obj.date_completed = getNewDate(item.date_completed);
-    if(obj.date_completed != null && obj.date_completed != ""){
-      obj.year_completed = getYear(obj.date_completed);
-      obj.month_completed = getMonth(obj.date_completed);
-      obj.day_completed = getDayMonth(obj.date_completed);
-      obj.day_of_week_completed = getWeekDay(obj.date_completed);
-      obj.week_completed = getWeekNumber(obj.date_completed);
-    }
-    obj.date_completed = getDate(obj.date_completed);
-  } 
-  obj.now = new Date();
-  obj.now_time = obj.now.getTime();
+  var payload = null;
+
+  payload =
+    {
+      "token" : token,
+      "sync_token" : '*',
+      "resource_types" : resource_type,
+      "commands" : commands
+    };
   
-  return (obj);
+  return(payload);
 }
-function getContentLabels(value)
+function getDataCompleted(token, api_version, spreadsheetId, config, ipc)
 {
-  var obj = new Object();
-  valeu = value.toString();
-  //
-  var index_labels = value.indexOf("@");
-  if(index_labels >=0){
-    obj.labels = [];
-    obj.content = value.substring(0, index_labels - 1);
-    var labels = value.substring(index_labels, value.length);
-    var tmp_labels = labels.split("@");
-    for(var i = 0; i < tmp_labels.length; i++){
-      var str = tmp_labels[i].trim();
-      if(str != "" && str != null) obj.labels.push(str);
-    }
-  } else {
-    obj.content = value;
-    obj.labels = [];
-  }
-  return (obj);
+  var api_url = getApiUrlGetCompleted();
+  var data = getResource(api_url, token, api_version, '["items"]', ipc, null, null, spreadsheetId, config);
+  return(data);
 }
-function getEmptyItemForTask()
-{
-  var item = new Object();
-  item.completed = 0;
-  item.is_deleted = false;
-  item.labels = [];
-  item.due = new Object();
-  //
-  item.due_date_utc = "";
-  item.year_due = "";
-  item.month_due = "";
-  item.day_due = "";
-  item.day_of_week_due = "";
-  item.week_due = "";
-  //
-  item.date_added = "";
-  item.year_added = "";
-  item.month_added = "";
-  item.week_added = "";
-  //
-  item.date_completed = "";
-  item.year_completed = "";
-  item.month_completed = "";
-  item.day_completed = "";
-  item.day_of_week_completed = "";
-  item.week_completed = "";
-  //
-  item.project_id = "";
-  item.responsible_uid = "";
-  item.all_day = false;
-  item.content = "";
-  item.priority = 1;
-  item.id = "";
-  item.now = "";
-  item.now_item = "";
-  item.user_name = "";
-  item.project_name = "";
-  item.responsible_uid = 0;
-  item.id_modified = -1;
-  
-  return (item);
-}
-function checkAcceptProjectsId(arr, need_id)
-{
-  if(arr == null) return(true);
-  if(need_id == null) return(false);
-  for each(var row in arr) {
-    if(row == need_id)return(true);
-  }
-  return(false);
-}
+
 function getApiUrlGet()
 {
   return (getApiUrl()+"items/get");
@@ -407,65 +857,35 @@ function getApiUrl()
 {
   return ("https://todoist.com/api/v8/");
 }
-function getSingleItem(token, id, spreadsheetId, config)
+//LABELS
+function getContentLabels(item, data_l)
 {
-  var apiURL = getApiUrlGet();
-  var item = null;
-  var data = getResource(apiURL, token, 7, '["item"]', null, id, "item_id", spreadsheetId, config);
-  if(data != null) item = data.item;
-  return(item);
-}
-function getFillForCompleted(item, row)
-{
-  //item.responsible_uid = row.user_id;
-  item.user_id = row.user_id;
-  item.id = row.id;
-  item.project_id = row.project_id;
-  item.date_completed = row.completed_date;
-  
-  return (item);
-}
-function convertArrStringToNumber(arr)
-{
-  var count = arr.length;
-  for(var i = 0; i< count; i++){
-    arr[i] = getNumberString(arr[i]);
+  var obj = new Object();
+  var value = "";
+  try{
+    value = "" + item.content;
+    //value = item.content.toString();
+  } catch(e){
+    console.error('kts function getContentLabels() yielded an error: ' + e);
   }
-  return (arr);
-}
-function getNumberString(str)
-{
-  var tmp = -1;
-  if(str == null || str == "") return (tmp);
-  tmp = Number(str);
-  return(tmp);
-}
-function getMaxDay(spreadsheetId, type)
-{
-  var tmp = 1;
-  type = type.toUpperCase();
-  if(type == "HOME") tmp = getParamValue(4, spreadsheetId);
-  if(type == "WORK") tmp = getParamValue(5, spreadsheetId);
-  tmp = getNumberString(tmp);
-  
-  return(tmp);
-}
-function getUserName(arr, need_id, default_name)
-{
-  var name = default_name;
-  if(arr == null) return(name);
-  if(need_id == 0 || need_id == null || need_id == "") return(name);
-
-  for each(var row in arr){
-    if(row.id == need_id) {
-      name = row.full_name;
-      break;
+  //
+  var index_labels = value.indexOf("@");
+  if(index_labels >=0){
+    obj.labels = [];
+    obj.content = value.substring(0, index_labels - 1);
+    var labels = value.substring(index_labels, value.length);
+    var tmp_labels = labels.split("@");
+    for(var i = 0; i < tmp_labels.length; i++){
+      var str = tmp_labels[i].trim();
+      if(str != "" && str != null) obj.labels.push(str);
     }
+  } else {
+    obj.content = value;
+    obj.labels = getLabelNames(item.labels, data_l);
   }
-
-  return(name);
+  return (obj);
 }
-function getLabelNames(arr, labels, default_name, token, spreadsheetId)
+function getLabelNames(arr, data_l, default_name, token, spreadsheetId)
 {
   var name = default_name;
   
@@ -477,20 +897,22 @@ function getLabelNames(arr, labels, default_name, token, spreadsheetId)
   var count = arr.length;
   
   for (var i = 0; i < count; i++){
-    arr[i] = getLabelName(arr[i].toString(), labels, "", token, spreadsheetId);
+    arr[i] = getLabelName(arr[i].toString(), data_l, "", token, spreadsheetId);
   }
 
   return(arr);
 }
-function getLabelName(need_id, labels, default_name, token, spreadsheetId)
+function getLabelName(need_id, data_l, default_name, token, spreadsheetId)
 {
   var name = default_name;
 
-  if(need_id == 0 || need_id == null || need_id == "" || labels == null) return(name);
-  for each(var row in labels.labels){
+  if(need_id == 0 || need_id == null || need_id == "" || data_l.labels == null) return(name);
+  for(var i in data_l.labels){
+    var row = data_l.labels[i];
     if(row.id == need_id) return (row.name);
   }
 }
+//PARAMS
 function setParamConfig(param_name, value, row_number, spreadsheetId, column_number)
 {
   var ss = SpreadsheetApp.openById(spreadsheetId);
@@ -503,115 +925,28 @@ function getParamValue(row_number, spreadsheetId, column_number)
 {
   var ss = SpreadsheetApp.openById(spreadsheetId);
   var sheet = ss.getSheetByName("config");
+  
   var value = null;
   if(column_number == null || column_number < 1){
     value = sheet.getRange(row_number, 2, 1, 1).getValues()[0][0];
   } else {
     value = sheet.getRange(row_number, column_number, 1, 1).getValues()[0][0];
   }
-  if(value == null || value == "") value = -1;
+  if(value == "") return(0);
+  if(value == null) return(-1);
   return(value);
 }
-
-function getAcceptProjects(need_projects_name, data_p)
+function getTokens(spreadsheetId)
 {
-  if(need_projects_name == null) return (null);
-  //if(data_p.projects == null) return (null);
-  var arr = [];
-  for each(var need_project_name in need_projects_name){
-    for each(var project in data_p.projects){
-      if(project.is_deleted == 1) continue;
-      if(arr.length > 0){
-        if(project.name.toUpperCase() == need_project_name.toUpperCase()){
-          arr.push(project.id);
-        } else {
-          if(!checkAcceptProjectsId(arr, project.parent_id)) continue;
-          if(checkAcceptProjectsId(arr, project.id)) continue;
-          arr.push(project.id);
-        }
-      } else {
-        if(project.name.toUpperCase() != need_project_name.toUpperCase()) continue;
-        arr.push(project.id);
-      }
-    }
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var sheet = ss.getSheetByName("users_tokens");
+  var sheet_values = sheet.getDataRange().getValues();
+  var maxRows = sheet_values.length;
+  var tokens = [];
+  for (i = 1; i < maxRows; i++){
+    tokens.push(sheet_values[i][1]).toString();
   }
-  return (arr);
-}
-function getNewDate(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  return (value);
-}
-function getDate(value)
-{
-  var moment = Moment.moment(value);
-    var new_value = "";
-    if(moment != null && value != null)
-    {
-      new_value = moment.toDate();
-    }
-  return(new_value);
-}
-function getWeekNumber(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  value = getNumberString(Utilities.formatDate(date, "GMT", "w"));
-  return (Number(value));
-}
-function getYear(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  value = date.getFullYear();
-  //value = getNumberString(Utilities.formatDate(value, "GMT", "y"));
-  return (Number(value));
-}
-function getDayMonth(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  value = getNumberString(Utilities.formatDate(date, "GMT", "d"));
-  return (Number(value));
-}
-function getWeekDay(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  var day = date.getDay();
-  if(day == 0) day = 7;
-  return (Number(day));
-}
-function getMonth(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  value = date.getMonth() + 1;
-  //value = getNumberString(Utilities.formatDate(date, "GMT", "m"));
-  return (Number(value));
-}
-function getDatePost(value)
-{
-  if(value == null || value == "") return ("");
-  var date = new Date(value);
-  value = Utilities.formatDate(date, "GMT", 'yyyy-MM-dd').toString();
-  //value = Utilities.formatDate(date, "GMT", 'yyyy-MM-dd\'T\'HH:mm').toString();
-  return (value);
-}
-function getProject(arr, need_id)
-{
-  var obj = null;
-  if(arr == null) return(obj);
-
-  for each(var row in arr){
-    if(row.id == need_id) {
-      obj = row;
-      break;
-    }
-  }
-
-  return(obj);
+  return(tokens);
 }
 function checkUrlfetch(spreadsheetId, is_start, config)
 {
@@ -639,213 +974,4 @@ function uuidv4() {
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-}
-function getDateNextWeek(date)
-{
-  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
-  
-  var now_day = getWeekDay(date);
-  var div = 8 - now_day;
-  date = getDate(date);
-  //
-  var next_week = new Date(date.getTime() + div * MILLIS_PER_DAY);
-  return (next_week);
-  
-}
-function createDayOfWeek(day, day_max, p, date)
-{
-  var obj = new Object();
-  
-  obj.day = Number(day);
-  obj.day_max = day_max;
-  obj.day_count = 0;
-  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
-  var week_date = getWeekDay(date);
-  if(day < week_date){
-    obj.date = new Date(date.getTime() - (week_date - day) * MILLIS_PER_DAY);
-  } else {
-    obj.date = new Date(date.getTime() + (day - week_date) * MILLIS_PER_DAY);
-  }
-  obj.date = getDate(obj.date);
-  obj.count_p1 = 0;
-  obj.count_p2 = 0;
-  obj.count_p3 = 0;
-  obj.count_p4 = 0;
-  if(p != null){
-    obj.max_p1 = p[0];
-    obj.max_p2 = p[1];
-    obj.max_p3 = p[2];
-    obj.max_p4 = p[3];
-  } else {
-    obj.max_p1 = 0;
-    obj.max_p2 = 0;
-    obj.max_p3 = 0;
-    obj.max_p4 = 0;
-  }
-  obj.items = [];
-  return (obj);
-}
-
-
-function createEmptyWeek(day_max, p, date)
-{
-  var arr_obj = [];
-  
-  for(var i=0;i<7;i++){
-    var obj = createDayOfWeek(i+1, day_max, p, date);
-    arr_obj.push(obj);
-  }
-  
-  return (arr_obj);
-}
-function updateTasks(resource_type, type, token, items, spreadsheetId, config)
-{
-  var apiURL = getApiUrlSync();
-  var commands = getCommands(items, type, 100);
-  var payload = getPayloadUpdateV7(resource_type, type, token, items, commands);
-  var options = getOptions(payload, "post");
-  var content = getResponseContent(apiURL, options, spreadsheetId, config);
-
-  return(content);
-}
-function getSingleLabel(token, id, spreadsheetId)
-{
-  var apiURL = getApiUrlGet();
-  var item = null;
-  var data = getResource(apiURL, token, 7, '["label"]', null, id, "label_id", spreadsheetId);
-  if(data != null) item = data.label;
-  return(item);
-}
-function getMaxCountRows(sheet)
-{
-  var count = 0;
-  //var sheet_data = sheet.getDataRange().getValues();
-  var sheet_values = sheet.getDataRange().getValues();
-  count = sheet_values.length;
-  /*for(var i = sheet_data.length-1 ; i >=0 ; i--){
-    if (sheet_data[i][0] != null && sheet_data[i][0] != ''){
-      count=i+1;
-      break;
-    }
-  }*/
-  
-  return(count);
-}
-function insertItemArrayIndexes(item)
-{
-  var arr = [];
-  arr.push(
-    item.date_added, //1
-    item.due_date_utc, //2
-    item.date_completed, //3
-    item.year_completed, //4
-    item.month_completed, //5
-    item.day_completed, //6
-    item.day_of_week_completed, //7
-    item.all_day, //8
-    item.content, //9
-    item.priority, //10
-    item.responsible_uid, //11
-    item.user_name, //12
-    item.completed, //13
-    item.project_id, //14
-    item.project_name, //15
-    "", //16
-    item.id, //17
-    item.now, //18
-    "", //19
-    item.id_modified, //19
-    item.now_time, //20
-    item.year_added, //21
-    item.month_added, //22
-    item.year_due, //23
-    item.month_due, //24
-    1, //25
-    item.labels //26
-  );
-  
-  return (arr);
-}
-function maxMinByName(arr, name)
-{
-  var value = [arr[0][name], 0, arr[0][name], 0];
-  for (var i = 1; i < arr.length; i++){
-    var item = arr[i];
-    if(item[name] > value[0]) {
-      value[0] = item[name];
-      value[1] = i;
-    }
-    if(item[name] < value[2]) {
-      value[2] = item[name];
-      value[3] = i;
-    }
-  }
-  return(value);
-}
-function maxByName(arr, name)
-{
-  var value = [arr[0][name], 0];
-  for (var i = 1; i < arr.length; i++){
-    var item = arr[i];
-    if(item[name] > value) {
-      value[0] = item[name];
-      value[1] = i;
-    }
-  }
-  return(value);
-}
-function minByName(arr, name)
-{
-  var value = [arr[0][name], 0];
-  for (var i = 1; i < arr.length; i++){
-    var item = arr[i];
-    if(item[name] < value) {
-      value[0] = item[name];
-      value[1] = i;
-    }
-  }
-  return(value);
-}
-function arrSortAscItemsByName(arr, name, type)
-{
-  var max_min_date =  maxMinByName(arr, name);
-  var max_date =  max_min_date[0];
-  var max_date_index =  max_min_date[1];
-  var min_date = max_min_date[2];
-  var min_date_index =  max_min_date[3];
-  //
-  if(type == null || type == "") type = "date";
-  var tmp_arr = [];
-  for (var i = 0; i < arr.length; i++){
-    tmp_arr.push(arr[i]);
-    for(var j = 0; j < tmp_arr.length; j++){
-      if(tmp_arr.length > 1){
-        var new_item = tmp_arr[tmp_arr.length - 1];
-        if(type == "date"){
-          if(new_item[name].getTime() < tmp_arr[j][name].getTime()){
-            var tmp_var = tmp_arr[j];
-            tmp_arr[j] = new_item;
-            tmp_arr[tmp_arr.length - 1] = tmp_var;
-          }
-        } else {
-          if(new_item[name] < tmp_arr[j][name]){
-            var tmp_var = tmp_arr[j];
-            tmp_arr[j] = new_item;
-            tmp_arr[tmp_arr.length - 1] = tmp_var;
-          }
-        }
-      }
-    }
-  }
-  var obj = new Object();
-  obj.arr = tmp_arr;
-  obj.max_min_date = max_min_date;
-  return (obj);
-}
-function getString(value)
-{
-  var str = "";
-  if(value == null) return (str);
-  str = "" + value;
-  return (str);
 }
